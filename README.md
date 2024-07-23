@@ -1,3 +1,5 @@
+A simple HTTP server made using C++.
+
 ```cpp
 #include "HttpServer.h"
 
@@ -17,3 +19,7 @@ int main()
 - Run `build.bat` to build this project.
   
 If built successfully, a static library with the name `web-server.lib` should be found inside `build/Release` directory.
+
+## Features
+- [ ] Caching
+- [ ] SSL Support
