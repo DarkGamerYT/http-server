@@ -1,7 +1,7 @@
 #include "HttpServer.h"
-inline std::map<std::string, std::string> extractParams(std::string path, std::string regPath, std::string reg);
 HttpServer::HttpServer()
 {
+	this->useSSL = false;
 #if defined(_WIN32)
 	WSADATA m_wsaData;
 	WSAStartup(MAKEWORD(2, 0), &m_wsaData);
@@ -11,7 +11,7 @@ HttpServer::HttpServer()
 	if (this->serverSocket < 0)
 	{
 		std::cout << "Failed to create a socket." << std::endl;
-		exit(1);
+		exit(-1);
 	};
 };
 HttpServer::~HttpServer() { this->close(); };
@@ -44,12 +44,20 @@ void HttpServer::close()
 #endif
 };
 
+inline std::regex pathToRegex(std::string route);
+inline std::vector<std::string> getParamNames(std::string route);
+inline std::map<std::string, std::string> getParamsData(Route route, std::string path);
 void HttpServer::_listen()
 {
 #if defined(__linux__)
 	int opt = 1;
-	setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	{
+		std::cout << "setsockopt SO_REUSEADDR." << std::endl;
+		exit(-1);
+	};
 #endif
+
 	if (bind(this->serverSocket, (struct sockaddr*)&socketAddress, sizeof(socketAddress)) < 0)
 	{
 		std::cout << "Failed to bind address." << std::endl;
@@ -58,13 +66,13 @@ void HttpServer::_listen()
 #	elif defined(__linux)
 		::close(this->serverSocket);
 #	endif
-		exit(1);
+		exit(-1);
 	};
 
 	if (::listen(this->serverSocket, this->mMaxConnections) < 0)
 	{
 		std::cout << "Failed to listen." << std::endl;
-		exit(1);
+		exit(-1);
 	};
 
 	// Receive connections
@@ -104,12 +112,19 @@ void HttpServer::_listen()
 		std::vector<Route>& routes = httpServer->routes[requestMethod];
 		for (const Route& route : routes)
 		{
-			bool match = std::regex_match(req.route(), std::regex(route.regexp));
+			bool match = std::regex_match(req.route(), route.route);
 			if (true == match)
 			{
-				std::map<std::string, std::string> params = extractParams(req.route(), route.route, route.regexp);
+				std::map<std::string, std::string> params = getParamsData(route, req.route());
 				req.mParams = params;
 				route.handle(req, res);
+
+				/*bool nextRoute = false;
+				std::function<void(void)> next = [&nextRoute] { nextRoute = true; };
+				route.handle(req, res, next);
+
+				if (!nextRoute)
+					break;*/
 			};
 		};
 
@@ -133,7 +148,20 @@ void HttpServer::_listen()
 	}, this);
 };
 
-inline std::string pathToRegex(std::string route)
+void HttpServer::_use(std::string method, std::string route, RequestHandler handler)
+{
+	std::regex routeRegex = pathToRegex(route);
+	std::vector<std::string> params = getParamNames(route);
+	if (this->routes.find(method) == this->routes.end())
+	{
+		this->routes[method].push_back({ routeRegex, params, handler });
+		return;
+	};
+
+	this->routes[method].push_back({ routeRegex, params, handler });
+};
+
+inline std::regex pathToRegex(std::string route)
 {
 	std::regex regex(R"([\/,\-@])");
 	route = std::regex_replace(route, std::regex(R"(\/:([^\/]+)\?)"), "(?:\\/([^\\/]+))?");
@@ -142,37 +170,30 @@ inline std::string pathToRegex(std::string route)
 	route = std::regex_replace(route, std::regex(R"(\/$)"), "");
 
 	route.append("(?:\\/)?");
-	return std::string("^").append(route).append("$");
+	return std::regex(std::string("^").append(route).append("$"));
 };
 
-void HttpServer::_use(std::string method, std::string route, std::function<void(Request, Response)> handler)
-{
-	if (this->routes.find(method) == this->routes.end())
-	{
-		this->routes[method].push_back({ route, pathToRegex(route), handler });
-		return;
-	};
-
-	this->routes[method].push_back({ route, pathToRegex(route), handler });
-};
-
-inline std::map<std::string, std::string> extractParams(std::string path, std::string regPath, std::string reg)
+inline std::vector<std::string> getParamNames(std::string route)
 {
 	std::vector<std::string> paramNames;
 	std::regex paramRegex(R"(:([^\/\?]+)\??)");
-	std::sregex_iterator iter(regPath.begin(), regPath.end(), paramRegex);
+	std::sregex_iterator iter(route.begin(), route.end(), paramRegex);
 	std::sregex_iterator end;
 	while (iter != end) {
 		paramNames.push_back((*iter)[1]);
 		++iter;
 	};
 
+	return paramNames;
+};
+
+inline std::map<std::string, std::string> getParamsData(Route route, std::string path)
+{
 	std::smatch match;
-	std::regex_match(path, match, std::regex(reg));
+	std::regex_match(path, match, route.route);
 	std::map<std::string, std::string> params;
-	for (size_t i = 0; i < paramNames.size(); ++i) {
-		params[paramNames[i]] = match[i + 1].str();
-	};
+	for (size_t i = 0; i < route.params.size(); ++i)
+		params[route.params[i]] = match[i + 1].str();
 
 	return params;
 };

@@ -31,9 +31,9 @@ class Response
 {
 	friend HttpServer;
 private:
-	std::map<std::string, std::string> headers;
 	int statusCode = 200;
 	bool mHeadersSent = false;
+	std::map<std::string, std::string> headers;
 
 protected:
 	SocketType mClientSocket;

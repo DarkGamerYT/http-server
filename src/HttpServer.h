@@ -19,11 +19,13 @@
 
 #include "Request.h"
 #include "Response.h"
+
+typedef std::function<void(Request, Response) > RequestHandler;
 struct Route
 {
-	std::string route;
-	std::string regexp;
-	std::function<void(Request, Response)> handle;
+	std::regex route;
+	std::vector<std::string> params;
+	RequestHandler handle;
 };
 
 class HttpServer
@@ -34,29 +36,38 @@ private:
 	std::map<std::string, std::vector<Route>> routes;
 
 protected:
-	int mMaxConnections = 20;
+	int mMaxConnections = 1024;
+	bool useSSL = false;
 
 public:
 	HttpServer();
 	~HttpServer();
 
-	void get(std::string route, std::function<void(Request, Response)> handler)
+	void get(std::string route, RequestHandler handler)
 	{ this->_use("GET", route, handler); };
-	void post(std::string route, std::function<void(Request, Response)> handler)
+
+	void post(std::string route, RequestHandler handler)
 	{ this->_use("POST", route, handler); };
-	void put(std::string route, std::function<void(Request, Response)> handler)
+	
+	void put(std::string route, RequestHandler handler)
 	{ this->_use("PUT", route, handler); };
-	void del(std::string route, std::function<void(Request, Response)> handler)
+	
+	void del(std::string route, RequestHandler handler)
 	{ this->_use("DELETE", route, handler); };
-	void options(std::string route, std::function<void(Request, Response)> handler)
+	
+	void options(std::string route, RequestHandler handler)
 	{ this->_use("OPTIONS", route, handler); };
-	void patch(std::string route, std::function<void(Request, Response)> handler)
+	
+	void patch(std::string route, RequestHandler handler)
 	{ this->_use("PATCH", route, handler); };
-	void head(std::string route, std::function<void(Request, Response)> handler)
+	
+	void head(std::string route, RequestHandler handler)
 	{ this->_use("HEAD", route, handler); };
-	void connect(std::string route, std::function<void(Request, Response)> handler)
+	
+	void connect(std::string route, RequestHandler handler)
 	{ this->_use("CONNECT", route, handler); };
-	void trace(std::string route, std::function<void(Request, Response)> handler)
+	
+	void trace(std::string route, RequestHandler handler)
 	{ this->_use("TRACE", route, handler); };
 
 	void listen(short port);
@@ -64,6 +75,6 @@ public:
 	void close();
 
 private:
-	void _use(std::string method, std::string route, std::function<void(Request, Response)> handler);
+	void _use(std::string method, std::string route, RequestHandler handler);
 	void _listen();
 };

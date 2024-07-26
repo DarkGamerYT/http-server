@@ -11,11 +11,8 @@ class Request
 	friend HttpServer;
 
 private:
-	std::string mMethod;
-	std::string mRoute;
-	std::string mBody;
-	std::map<std::string, std::string> mParams;
-	std::map<std::string, std::string> mHeaders;
+	std::string mMethod, mRoute, mBody;
+	std::map<std::string, std::string> mParams, mHeaders;
 
 public:
 	Request(std::string data);
