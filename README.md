@@ -1,22 +1,23 @@
 A simple HTTP server made using C++.
 
 ```cpp
-#include "HttpServer.h"
+#include "HttpServer.hpp"
 
-HttpServer httpServer;
-int main()
+HttpServer g_Server;
+int main(int argc, char* argv[])
 {
-	httpServer.get("/", [](Request req, Response res) {
-		res.send("Hello, world!");
-	});
+    g_Server.use("/", HttpMethod::GET, [](HttpRequest request, HttpResponse response) {
+        response.setHeader("Content-Type", "text/plain");
+        response.send("Hello, world!");
+    });
 
-	httpServer.listen(3000);
+    g_Server.listen(8080);
 };
 ```
 
 ## Building
 - Install [CMake](https://cmake.org/download)
-- Run `build.bat` to build this project.
+- Run `build.bat`, or `build.sh` to build this project.
   
 If built successfully, a static library with the name `web-server.lib` should be found inside `build/Release` directory.
 
