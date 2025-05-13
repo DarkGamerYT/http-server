@@ -2,6 +2,7 @@
 #define HTTPMETHOD_HPP
 
 #include <string>
+#include <algorithm>
 
 #undef DELETE
 namespace HttpMethod
@@ -44,6 +45,44 @@ namespace HttpMethod
             case HttpMethod::PATCH:   return "PATCH";
 
             default: return std::string();
+        };
+    };
+
+    inline HttpMethod::Method fromString(const std::string& method)
+    {
+        std::string methodString;
+        std::transform(method.begin(), method.end(), std::back_inserter(methodString),
+            [](char c) { return toupper(c); });
+
+        if (methodString == "GET") {
+            return HttpMethod::GET;
+        }
+        else if (methodString == "HEAD") {
+            return HttpMethod::HEAD;
+        }
+        else if (methodString == "POST") {
+            return HttpMethod::POST;
+        }
+        else if (methodString == "PUT") {
+            return HttpMethod::PUT;
+        }
+        else if (methodString == "DELETE") {
+            return HttpMethod::DELETE;
+        }
+        else if (methodString == "CONNECT") {
+            return HttpMethod::CONNECT;
+        }
+        else if (methodString == "OPTIONS") {
+            return HttpMethod::OPTIONS;
+        }
+        else if (methodString == "TRACE") {
+            return HttpMethod::TRACE;
+        }
+        else if (methodString == "PATCH") {
+            return HttpMethod::PATCH;
+        }
+        else {
+            throw std::invalid_argument("Unexpected HTTP method");
         };
     };
 };

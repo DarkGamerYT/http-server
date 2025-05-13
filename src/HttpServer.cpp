@@ -97,7 +97,7 @@ void HttpServer::proccessRequests(int workerId)
 {
 	while (this->m_bIsRunning)
 	{
-		int clientSocket;
+		Socket_t clientSocket;
 		{
 			std::unique_lock lock(m_QueueMutex);
 			m_QueueCondVar.wait(lock, [this] { return !m_RequestQueue.empty(); });
@@ -117,7 +117,23 @@ void HttpServer::proccessRequests(int workerId)
 			return;
 
 		std::string data(buffer.data(), bytesReceived);
-		std::cout << data << std::endl;
+		HttpRequest request{ data };
+
+		const std::string& path = request.getPath();
+		const auto& method = request.getMethod();
+		if (this->m_Routes.find(path) == this->m_Routes.end())
+		{
+			continue;
+		};
+
+		const auto& route = this->m_Routes[path];
+		if (route.find(method) == route.end())
+		{
+			continue;
+		};
+
+		const RequestHandler_t& handler = route.at(method);
+		handler(request, { clientSocket, request });
 	};
 };
 
@@ -125,6 +141,6 @@ void HttpServer::use(const std::string& route, HttpMethod::Method method,
 	const RequestHandler_t callback)
 {
 	this->m_Routes[route].insert(
-		std::make_pair(method, std::move(callback))
+		std::make_pair(method, callback)
 	);
 };

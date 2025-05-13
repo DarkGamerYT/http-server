@@ -22,15 +22,11 @@
 #include <mutex>
 #include <condition_variable>
 
-#if defined(_WIN32)
-typedef SOCKET Socket_t;
-#elif defined(__unix__)
-typedef int Socket_t;
-#endif
-
 #include "HttpMethod.hpp"
+#include "HttpRequest.hpp"
+#include "HttpResponse.hpp"
 
-typedef std::function<void()> RequestHandler_t;
+typedef std::function<void(HttpRequest, HttpResponse)> RequestHandler_t;
 
 class HttpServer
 {
@@ -40,8 +36,8 @@ private:
     static constexpr int s_MaxWorkerThreads = 4;
 
     bool m_bIsRunning = false;
-    std::thread m_WorkerThreads[s_MaxWorkerThreads];
-    std::queue<int> m_RequestQueue;
+    std::vector<std::thread> m_WorkerThreads{ s_MaxWorkerThreads };
+    std::queue<Socket_t> m_RequestQueue;
     std::mutex m_QueueMutex;
     std::condition_variable m_QueueCondVar;
 
