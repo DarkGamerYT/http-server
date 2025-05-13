@@ -1,19 +1,26 @@
-﻿cmake_minimum_required(VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.28)
 set(CMAKE_CXX_STANDARD 23)
-
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(NAME http-server)
-project(${NAME} VERSION 1.0)
 
-file(GLOB_RECURSE SOURCES
-    "src/*.h"
-    "src/*.cpp"
-    "src/**.h"
-    "src/**.cpp"
-)
-add_library(${NAME} STATIC ${SOURCES})
+option(HTTP_BUILD_EXAMPLES "Build examples" ON)
 
-add_executable(http "src-test/http.cpp")
-target_link_libraries(http PUBLIC ${NAME})
+# Enable Hot Reload for MSVC compilers if supported.
+if (POLICY CMP0141)
+  cmake_policy(SET CMP0141 NEW)
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+endif()
 
-add_executable(https "src-test/https.cpp")
-target_link_libraries(https PUBLIC ${NAME})
+project(${NAME} LANGUAGES CXX VERSION 1.0.0)
+
+file(GLOB_RECURSE SRC "./src/*.cpp")
+add_library(${NAME} STATIC ${SRC})
+target_include_directories(
+    ${NAME}
+    INTERFACE
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+
+if (HTTP_BUILD_EXAMPLES)
+	add_subdirectory(src-examples)
+endif()
