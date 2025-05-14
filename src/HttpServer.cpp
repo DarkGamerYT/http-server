@@ -18,7 +18,7 @@ HttpServer::~HttpServer()
     this->close();
 };
 
-void HttpServer::listen(short port)
+void HttpServer::listen(unsigned short port)
 {
     this->m_SocketAddress.sin_port = htons(port);
     this->m_SocketAddress.sin_addr.s_addr = INADDR_ANY;
@@ -26,7 +26,7 @@ void HttpServer::listen(short port)
     this->listen();
 };
 
-void HttpServer::listen(const char* address, short port)
+void HttpServer::listen(const char* address, unsigned short port)
 {
     this->m_SocketAddress.sin_port = htons(port);
     inet_pton(AF_INET, address, &(this->m_SocketAddress.sin_addr.s_addr));

@@ -55,8 +55,8 @@ public:
     void use(const std::string& route, HttpMethod::Method method,
         const RequestHandler_t callback);
 
-    void listen(short port);
-    void listen(const char* address, short port);
+    void listen(unsigned short port);
+    void listen(const char* address, unsigned short port);
     void close();
 
 private:
