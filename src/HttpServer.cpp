@@ -142,6 +142,7 @@ void HttpServer::proccessRequests(int workerId)
 
             bExists = true;
             handlers = data;
+            request.setOriginalPath(route);
             break;
         };
 

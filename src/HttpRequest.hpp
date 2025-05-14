@@ -12,8 +12,10 @@ typedef std::unordered_map<std::string, std::string> Map_t;
 
 class HttpRequest
 {
+    friend class HttpServer;
+
 private:
-    std::string m_Path, m_Body;
+    std::string m_Path, m_OriginalPath, m_Body;
     HttpMethod::Method m_Method;
     HttpVersion::Version m_Version;
     Map_t m_Headers;
@@ -23,11 +25,15 @@ public:
     ~HttpRequest() = default;
 
     std::string getPath() const { return this->m_Path; };
+    std::string getOriginalPath() const { return this->m_OriginalPath; };
     std::string getBody() const { return this->m_Body; };
     Map_t getHeaders() const { return this->m_Headers; };
 
     HttpMethod::Method getMethod() const { return this->m_Method; };
     HttpVersion::Version getVersion() const { return this->m_Version; };
+
+private:
+    void setOriginalPath(const std::string& path) { this->m_OriginalPath = path; };
 };
 
 #endif // !HTTPREQUEST_HPP
