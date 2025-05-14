@@ -58,11 +58,8 @@ HttpRequest::HttpRequest(const std::string& data)
         std::getline(header, key, ':');
         std::getline(header, value);
 
-        key.erase(std::remove_if(key.begin(), key.end(),
-            [](char c) { return std::isspace(c); }), key.end());
-
-        value.erase(std::remove_if(value.begin(), value.end(),
-            [](char c) { return std::isspace(c); }), value.end());
+        std::erase_if(key, [](char c) { return std::isspace(c); });
+        std::erase_if(value, [](char c) { return std::isspace(c); });
 
         this->m_Headers[key] = value;
     };

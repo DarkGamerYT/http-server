@@ -223,7 +223,7 @@ namespace HttpStatus
             case HttpStatus::NotExtended:                   return "Not Extended";
             case HttpStatus::NetworkAuthenticationRequired: return "Network Authentication Required";
 
-            default: return std::string();
+            default: return {};
         };
     };
 };

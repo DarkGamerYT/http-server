@@ -44,14 +44,14 @@ namespace HttpMethod
             case HttpMethod::TRACE:   return "TRACE";
             case HttpMethod::PATCH:   return "PATCH";
 
-            default: return std::string();
+            default: return {};
         };
     };
 
     inline HttpMethod::Method fromString(const std::string& method)
     {
         std::string methodString;
-        std::transform(method.begin(), method.end(), std::back_inserter(methodString),
+        std::ranges::transform(method, std::back_inserter(methodString),
             [](char c) { return toupper(c); });
 
         if (methodString == "GET") {

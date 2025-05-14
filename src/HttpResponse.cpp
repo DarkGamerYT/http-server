@@ -2,7 +2,7 @@
 
 bool HttpResponse::send(std::string data)
 {
-    if (this->m_Headers.find("Content-Type") == this->m_Headers.end())
+    if (!this->m_Headers.contains("Content-Type"))
         this->setHeader("Content-Type", "text/html");
 
     size_t length = data.length();
@@ -54,11 +54,10 @@ bool HttpResponse::sendToSocket(const std::string& data)
         return false;
 
 #if defined(_WIN32)
-    int bytesSent;
     long totalBytesSent = 0;
     while (totalBytesSent < data.size())
     {
-        bytesSent = ::send(this->m_ClientSocket, data.c_str(), data.size(), 0);
+        int bytesSent = ::send(this->m_ClientSocket, data.c_str(), static_cast<int>(data.size()), 0);
         if (bytesSent < 0)
             break;
 

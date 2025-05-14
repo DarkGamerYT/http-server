@@ -24,14 +24,14 @@ namespace HttpVersion
             case HttpVersion::HTTP_1_1: return "HTTP/1.1";
             case HttpVersion::HTTP_2_0: return "HTTP/2.0";
 
-            default: return std::string();
+            default: return {};
         };
     };
 
     inline Version fromString(const std::string& version)
     {
         std::string versionString;
-        std::transform(version.begin(), version.end(), std::back_inserter(versionString),
+        std::ranges::transform(version, std::back_inserter(versionString),
             [](char c) { return toupper(c); });
 
         if (versionString == "HTTP/0.9") {

@@ -57,12 +57,12 @@ void HttpServer::listen()
 #endif
 
     this->m_SocketAddress.sin_family = AF_INET;
-    if (bind(this->m_ServerSocket, (struct sockaddr*)&m_SocketAddress, sizeof(m_SocketAddress)) < 0)
+    if (bind(this->m_ServerSocket, reinterpret_cast<sockaddr *>(&m_SocketAddress), sizeof(m_SocketAddress)) < 0)
     {
         throw std::runtime_error("Failed to bind to socket");
     };
 
-    if (::listen(this->m_ServerSocket, this->s_MaxConnections) < 0)
+    if (::listen(this->m_ServerSocket, s_MaxConnections) < 0)
     {
         throw std::runtime_error("Failed to listen");
     };
@@ -81,7 +81,7 @@ void HttpServer::receiveConnections()
         sockaddr_in clientAddress{};
         socklen_t addressLength = sizeof(clientAddress);
 
-        int clientSocket = accept(this->m_ServerSocket, (struct sockaddr*)&clientAddress, &addressLength);
+        Socket_t clientSocket = accept(this->m_ServerSocket, reinterpret_cast<struct sockaddr *>(&clientAddress), &addressLength);
         if (clientSocket < 0)
             continue;
 
@@ -108,7 +108,7 @@ void HttpServer::proccessRequests(int workerId)
 
         std::vector<char> buffer(s_MaxBufferSize);
     #if defined(_WIN32)
-        int bytesReceived = recv(clientSocket, buffer.data(), buffer.size(), 0);
+        int bytesReceived = recv(clientSocket, buffer.data(), static_cast<int>(buffer.size()), 0);
     #elif defined(__unix__)
         int bytesReceived = read(clientSocket, buffer.data(), buffer.size());
     #endif
@@ -121,26 +121,57 @@ void HttpServer::proccessRequests(int workerId)
 
         const std::string& path = request.getPath();
         const auto& method = request.getMethod();
-        if (this->m_Routes.find(path) == this->m_Routes.end())
+
+        bool bExists = false;
+        RouteHandlers_t handlers{};
+        for (const auto& [route, data] : m_Routes)
+        {
+            try {
+                std::regex pattern{ route };
+                if (!std::regex_match(path, pattern))
+                {
+                    continue;
+                };
+            }
+            catch (const std::regex_error&) {
+                if (route != path)
+                {
+                    continue;
+                };
+            };
+
+            bExists = true;
+            handlers = data;
+            break;
+        };
+
+        if (false == bExists)
         {
             continue;
         };
 
-        const auto& route = this->m_Routes[path];
-        if (route.find(method) == route.end())
+        if (!handlers.contains(method))
         {
             continue;
         };
 
-        const RequestHandler_t& handler = route.at(method);
+        const RequestHandler_t& handler = handlers.at(method);
         handler(request, { clientSocket, request });
     };
 };
 
 void HttpServer::use(const std::string& route, HttpMethod::Method method,
-    const RequestHandler_t callback)
+    const RequestHandler_t& callback)
 {
     this->m_Routes[route].insert(
         std::make_pair(method, callback)
     );
+};
+
+RequestHandler_t HttpServer::useStatic(const std::string& directory)
+{
+    return [](const HttpRequest& request, HttpResponse response) {
+        response.setHeader("Content-Type", "text/plain");
+        response.send("This is a test");
+    };
 };

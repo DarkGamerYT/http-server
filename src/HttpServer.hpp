@@ -21,12 +21,15 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <regex>
+#include <variant>
 
 #include "HttpMethod.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
 typedef std::function<void(HttpRequest, HttpResponse)> RequestHandler_t;
+typedef std::unordered_map<HttpMethod::Method, RequestHandler_t> RouteHandlers_t;
 
 class HttpServer
 {
@@ -45,19 +48,20 @@ private:
     sockaddr_in m_SocketAddress{};
     std::thread m_ListenerThread;
 
-    std::unordered_map<std::string,
-        std::unordered_map<HttpMethod::Method, RequestHandler_t>> m_Routes;
+    std::unordered_map<std::string, RouteHandlers_t> m_Routes;
 
 public:
 	HttpServer();
 	~HttpServer();
 
     void use(const std::string& route, HttpMethod::Method method,
-        const RequestHandler_t callback);
+        const RequestHandler_t& callback);
 
     void listen(unsigned short port);
     void listen(const char* address, unsigned short port);
     void close();
+
+    static RequestHandler_t useStatic(const std::string& directory);
 
 private:
     void listen();
