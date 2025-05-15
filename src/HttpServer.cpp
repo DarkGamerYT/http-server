@@ -169,10 +169,73 @@ void HttpServer::use(const std::string& route, HttpMethod::Method method,
     );
 };
 
+inline std::string extractPrefix(const std::string& regexPath)
+{
+    size_t i = 0;
+    while (i < regexPath.size()) {
+        char character = regexPath[i];
+        if (
+            std::isalnum(character)
+            || character == '^'
+            || character == '/'
+            || character == '_'
+            || character == '-'
+        ) {
+            ++i;
+            continue;
+        };
+
+        break;
+    };
+
+    return regexPath.substr(0, i);
+};
+
 RequestHandler_t HttpServer::useStatic(const std::string& directory)
 {
-    return [](const HttpRequest& request, HttpResponse response) {
-        response.setHeader("Content-Type", "text/plain");
-        response.send("This is a test");
+    return [directory](const HttpRequest& request, HttpResponse response) {
+        const std::string& fullPath = request.getPath();
+        const std::string& originalPattern = request.getOriginalPath();
+
+        std::string routePrefix = extractPrefix(originalPattern);
+        if (fullPath.find(routePrefix) != 0) {
+            response.setStatus(HttpStatus::NotFound);
+            response.setHeader("Content-Type", "text/plain");
+            response.send("Not Found");
+            return;
+        }
+
+        std::string relative = fullPath.substr(routePrefix.length());
+        if (!relative.empty() && relative.front() == '/')
+            relative.erase(0, 1);
+
+        std::filesystem::path requestedPath = std::filesystem::path(directory) / relative;
+        std::error_code error;
+
+        auto canonicalPath = std::filesystem::weakly_canonical(requestedPath, error);
+        auto canonicalRoot = std::filesystem::weakly_canonical(directory, error);
+
+        if (
+            error
+            || canonicalPath.string().find(canonicalRoot.string()) != 0
+            || canonicalPath.filename().string().starts_with("."))
+        {
+            response.setStatus(HttpStatus::Forbidden);
+            response.setHeader("Content-Type", "text/plain");
+            response.send("Forbidden");
+            return;
+        };
+
+        if (
+            !std::filesystem::exists(canonicalPath) ||
+            !std::filesystem::is_regular_file(canonicalPath))
+        {
+            response.setStatus(HttpStatus::NotFound);
+            response.setHeader("Content-Type", "text/plain");
+            response.send("File Not Found");
+            return;
+        };
+
+        response.sendFile(canonicalPath);
     };
 };
