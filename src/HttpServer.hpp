@@ -47,7 +47,6 @@ private:
 
     Socket_t m_ServerSocket{ 0 };
     sockaddr_in m_SocketAddress{};
-    std::thread m_ListenerThread;
 
     std::unordered_map<std::string, RouteHandlers_t> m_Routes;
 

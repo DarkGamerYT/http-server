@@ -36,7 +36,7 @@ void HttpServer::listen(const char* address, unsigned short port)
 
 void HttpServer::close()
 {
-    m_ListenerThread.join();
+    this->m_bIsRunning = false;
 
 #if defined(_WIN32)
     closesocket(this->m_ServerSocket);
@@ -68,10 +68,12 @@ void HttpServer::listen()
     };
 
     this->m_bIsRunning = true;
-    m_ListenerThread = std::thread(&HttpServer::receiveConnections, this);
     for (int i = 0; i < s_MaxWorkerThreads; i++) {
         m_WorkerThreads[i] = std::thread(&HttpServer::proccessRequests, this, i);
+        m_WorkerThreads[i].detach();
     };
+
+    this->receiveConnections();
 };
 
 void HttpServer::receiveConnections()
