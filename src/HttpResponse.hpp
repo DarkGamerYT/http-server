@@ -7,21 +7,21 @@
     #include <unistd.h>
 #endif
 
-#include "HttpRequest.hpp"
-#include "HttpStatus.hpp"
-
 #if defined(_WIN32)
     typedef SOCKET Socket_t;
 #elif defined(__unix__)
     typedef int Socket_t;
 #endif
 
+#include "HttpRequest.hpp"
+#include "HttpStatus.hpp"
+
 class HttpResponse
 {
 private:
     bool m_HeadersSent = false;
     HttpStatus::Code m_StatusCode = HttpStatus::OK;
-    std::unordered_map<std::string, std::string> m_Headers;
+    HeadersMap_t m_Headers;
 
 protected:
     Socket_t m_ClientSocket;
@@ -32,11 +32,17 @@ public:
         m_ClientSocket(clientSocket),
         m_Request(req) {};
 
-    bool send(std::string data);
+    HttpResponse& setStatus(HttpStatus::Code status) { this->m_StatusCode = status; return *this; };
 
+    bool send(std::string data);
+    bool redirect(const std::string& location);
+
+    const std::string& getHeader(const std::string& key) { return this->m_Headers[key]; };
     void setHeader(const std::string& key, const std::string& value) { this->m_Headers[key] = value; };
-    std::string getHeader(const std::string& key) { return this->m_Headers[key]; };
     bool removeHeader(const std::string& key) { return this->m_Headers.erase(key) != 0; };
+
+    void setHeaders(const HeadersMap_t& headers);
+    const HeadersMap_t& getHeaders() const { return this->m_Headers; };
 
 private:
     std::ostringstream toHttpString();

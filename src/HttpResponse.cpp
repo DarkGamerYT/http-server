@@ -27,12 +27,26 @@ bool HttpResponse::send(std::string data)
     std::ostringstream stream = this->toHttpString();
     const auto& requestMethod = this->m_Request.getMethod();
     bool bIsSuccessful = (this->m_StatusCode >= 200 && this->m_StatusCode < 300);
-    if (requestMethod != HttpMethod::HEAD &&
+    if (
+        requestMethod != HttpMethod::HEAD &&
         (requestMethod != HttpMethod::CONNECT && bIsSuccessful))
+    {
         stream << "\r\n" << data;
+    };
 
     return this->sendToSocket(stream.str());
 };
+
+bool HttpResponse::redirect(const std::string& location)
+{
+    if (this->m_StatusCode < 300 || this->m_StatusCode >= 400)
+        this->m_StatusCode = HttpStatus::Found;
+
+    this->setHeader("Location", location);
+
+    std::ostringstream stream = this->toHttpString();
+    return this->sendToSocket(stream.str());
+}
 
 std::ostringstream HttpResponse::toHttpString()
 {
@@ -46,6 +60,12 @@ std::ostringstream HttpResponse::toHttpString()
     for (const auto& [key, value] : this->m_Headers)
         stream << key << ": " << value << "\r\n";
     return stream;
+};
+
+void HttpResponse::setHeaders(const std::unordered_map<std::string, std::string>& headers)
+{
+    for (const auto& [key, value] : headers)
+        this->setHeader(key, value);
 };
 
 bool HttpResponse::sendToSocket(const std::string& data)
