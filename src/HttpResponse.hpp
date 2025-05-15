@@ -1,6 +1,8 @@
 #ifndef HTTPRESPONSE_HPP
 #define HTTPRESPONSE_HPP
 
+#include <fstream>
+
 #if defined(_WIN32)
     #include <WinSock2.h>
 #elif defined(__linux__)
@@ -14,7 +16,8 @@
 #endif
 
 #include "HttpRequest.hpp"
-#include "HttpStatus.hpp"
+#include "util/HttpStatus.hpp"
+#include "util/MimeType.hpp"
 
 class HttpResponse
 {
@@ -35,6 +38,7 @@ public:
     HttpResponse& setStatus(HttpStatus::Code status) { this->m_StatusCode = status; return *this; };
 
     bool send(std::string data);
+    bool sendFile(const std::filesystem::path& path);
     bool redirect(const std::string& location);
 
     const std::string& getHeader(const std::string& key) { return this->m_Headers[key]; };

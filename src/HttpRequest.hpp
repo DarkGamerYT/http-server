@@ -5,8 +5,8 @@
 #include <stdexcept>
 #include <sstream>
 
-#include "HttpMethod.hpp"
-#include "HttpVersion.hpp"
+#include "util/HttpMethod.hpp"
+#include "util/HttpVersion.hpp"
 
 typedef std::unordered_map<std::string, std::string> HeadersMap_t;
 class HttpRequest

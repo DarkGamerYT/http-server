@@ -37,6 +37,23 @@ bool HttpResponse::send(std::string data)
     return this->sendToSocket(stream.str());
 };
 
+bool HttpResponse::sendFile(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+    {
+        this->setStatus(HttpStatus::InternalServerError);
+        this->setHeader("Content-Type", "text/plain");
+        return this->send("Server Error");
+    };
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+
+    this->setHeader("Content-Type", MimeType::getMimeType(path));
+    return this->send(buffer.str());
+};
+
 bool HttpResponse::redirect(const std::string& location)
 {
     if (this->m_StatusCode < 300 || this->m_StatusCode >= 400)
