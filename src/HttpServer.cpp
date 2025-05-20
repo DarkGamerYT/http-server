@@ -89,7 +89,7 @@ void HttpServer::receiveConnections()
 
         {
             std::unique_lock lock(m_QueueMutex);
-            m_RequestQueue.push(clientSocket);
+            m_RequestQueue.emplace(clientSocket, clientAddress);
         };
         m_QueueCondVar.notify_one(); // Wake up one waiting worker
     };
@@ -99,12 +99,15 @@ void HttpServer::proccessRequests(int workerId)
 {
     while (this->m_bIsRunning)
     {
+        sockaddr_in clientAddress{};
         Socket_t clientSocket;
         {
             std::unique_lock lock(m_QueueMutex);
             m_QueueCondVar.wait(lock, [this] { return !m_RequestQueue.empty(); });
 
-            clientSocket = m_RequestQueue.front();
+            const auto& [ socket, address ] = m_RequestQueue.front();
+            clientSocket = socket;
+            clientAddress = address;
             m_RequestQueue.pop();
         };
 
@@ -119,7 +122,7 @@ void HttpServer::proccessRequests(int workerId)
             return;
 
         std::string data(buffer.data(), bytesReceived);
-        HttpRequest request{ data };
+        HttpRequest request{ clientSocket, data };
 
         const std::string& path = request.getPath();
         const auto& method = request.getMethod();

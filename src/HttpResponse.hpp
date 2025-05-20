@@ -3,18 +3,6 @@
 
 #include <fstream>
 
-#if defined(_WIN32)
-    #include <WinSock2.h>
-#elif defined(__linux__)
-    #include <unistd.h>
-#endif
-
-#if defined(_WIN32)
-    typedef SOCKET Socket_t;
-#elif defined(__unix__)
-    typedef int Socket_t;
-#endif
-
 #include "HttpRequest.hpp"
 #include "util/HttpStatus.hpp"
 #include "util/MimeType.hpp"

@@ -1,7 +1,9 @@
 #include "HttpRequest.hpp"
 #include <iostream>
-HttpRequest::HttpRequest(const std::string& data)
+HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
 {
+    this->m_ClientSocket = clientSocket;
+
     size_t lpos = 0, rpos = 0;
     rpos = data.find("\r\n", lpos);
     if (rpos == std::string::npos)
@@ -65,4 +67,22 @@ HttpRequest::HttpRequest(const std::string& data)
     };
 
     this->m_Body = body;
+};
+
+std::string HttpRequest::getRemoteAddr() const
+{
+    sockaddr_in addr{};
+    socklen_t addrLen = sizeof(addr);
+
+    if (getpeername(this->m_ClientSocket, reinterpret_cast<sockaddr*>(&addr), &addrLen) == -1)
+        return "127.0.0.1";
+
+#if defined(_WIN32)
+    char address[INET_ADDRSTRLEN];
+    InetNtop(AF_INET, &addr.sin_addr, address, INET_ADDRSTRLEN);
+
+    return address;
+#else
+    return std::string(inet_ntoa(addr.sin_addr));
+#endif
 };

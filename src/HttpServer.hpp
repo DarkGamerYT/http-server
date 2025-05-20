@@ -41,7 +41,7 @@ private:
 
     bool m_bIsRunning = false;
     std::vector<std::thread> m_WorkerThreads{ s_MaxWorkerThreads };
-    std::queue<Socket_t> m_RequestQueue;
+    std::queue<std::pair<Socket_t, sockaddr_in>> m_RequestQueue;
     std::mutex m_QueueMutex;
     std::condition_variable m_QueueCondVar;
 
