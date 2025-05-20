@@ -26,15 +26,20 @@ bool HttpResponse::send(std::string data)
 
     std::ostringstream stream = this->toHttpString();
     const auto& requestMethod = this->m_Request.getMethod();
-    bool bIsSuccessful = (this->m_StatusCode >= 200 && this->m_StatusCode < 300);
     if (
         requestMethod != HttpMethod::HEAD &&
-        (requestMethod != HttpMethod::CONNECT && bIsSuccessful))
-    {
+        requestMethod != HttpMethod::CONNECT
+    ) {
         stream << "\r\n" << data;
     };
 
     return this->sendToSocket(stream.str());
+};
+
+bool HttpResponse::sendStatus(HttpStatus::Code status)
+{
+    this->m_StatusCode = status;
+    return this->send("");
 };
 
 bool HttpResponse::sendFile(const std::filesystem::path& path)

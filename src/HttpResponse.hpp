@@ -26,6 +26,7 @@ public:
     HttpResponse& setStatus(HttpStatus::Code status) { this->m_StatusCode = status; return *this; };
 
     bool send(std::string data);
+    bool sendStatus(HttpStatus::Code status);
     bool sendFile(const std::filesystem::path& path);
     bool redirect(const std::string& location);
 
