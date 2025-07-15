@@ -38,10 +38,10 @@ class HttpServer
 private:
     static constexpr int s_MaxConnections = 1024;
     static constexpr int s_MaxBufferSize = 65536;
-    static constexpr int s_MaxWorkerThreads = 4;
+    static unsigned int s_MaxWorkerThreads;
 
     bool m_bIsRunning = false;
-    std::vector<std::thread> m_WorkerThreads{ s_MaxWorkerThreads };
+    std::vector<std::thread> m_WorkerThreads;
     std::queue<std::pair<Socket_t, sockaddr_in>> m_RequestQueue;
     std::mutex m_QueueMutex;
     std::condition_variable m_QueueCondVar;

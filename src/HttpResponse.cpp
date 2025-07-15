@@ -119,7 +119,7 @@ void HttpResponse::closeSocket() const
 {
 #if defined(_WIN32)
     ::closesocket(this->m_ClientSocket);
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
     ::close(this->m_ClientSocket);
 #endif
 };

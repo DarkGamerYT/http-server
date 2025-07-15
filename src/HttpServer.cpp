@@ -1,4 +1,6 @@
 #include "HttpServer.hpp"
+
+unsigned int HttpServer::s_MaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());
 HttpServer::HttpServer()
 {
 #if defined(_WIN32)
@@ -38,27 +40,40 @@ void HttpServer::listen(const char* address, unsigned short port)
 
 void HttpServer::close()
 {
+    if (!this->m_bIsRunning)
+        return;
+    
     this->m_bIsRunning = false;
+    
+    // Notify all waiting threads to wake up and exit
+    m_QueueCondVar.notify_all();
 
-    if (this->m_ServerSocket != -1) {
-    #if defined(_WIN32)
-        closesocket(this->m_ServerSocket);
-        WSACleanup();
-    #elif defined(__unix__) || defined(__APPLE__)
-        ::close(this->m_ServerSocket);
-    #endif
+    // Join all worker threads
+    for (auto& thread : m_WorkerThreads) {
+        if (!thread.joinable())
+            continue;
+        
+        thread.join();
     };
+    
+    if (this->m_ServerSocket == -1)
+        return;
+
+#if defined(_WIN32)
+    closesocket(this->m_ServerSocket);
+    WSACleanup();
+#elif defined(__unix__) || defined(__APPLE__)
+    ::close(this->m_ServerSocket);
+#endif
+        
+    this->m_ServerSocket = -1;
 };
 
 void HttpServer::listen()
 {
 #if defined(__unix__) || defined(__APPLE__)
     int opt = 1;
-  #if defined(__APPLE__)
     if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-  #else
-    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0)
-  #endif
     {
         throw std::runtime_error("Failed to set socket options");
     };
@@ -76,9 +91,10 @@ void HttpServer::listen()
     };
 
     this->m_bIsRunning = true;
-    for (int i = 0; i < s_MaxWorkerThreads; i++) {
+    
+    m_WorkerThreads.resize(s_MaxWorkerThreads);
+    for (auto i = 0; i < s_MaxWorkerThreads; i++) {
         m_WorkerThreads[i] = std::thread(&HttpServer::proccessRequests, this, i);
-        m_WorkerThreads[i].detach();
     };
 
     this->receiveConnections();
@@ -111,7 +127,12 @@ void HttpServer::proccessRequests(int workerId)
         Socket_t clientSocket;
         {
             std::unique_lock lock(m_QueueMutex);
-            m_QueueCondVar.wait(lock, [this] { return !m_RequestQueue.empty(); });
+            m_QueueCondVar.wait(lock, [this] {
+                return !m_RequestQueue.empty() || !m_bIsRunning;
+            });
+            
+            if (!m_bIsRunning && m_RequestQueue.empty())
+                break;
 
             const auto& [ socket, address ] = m_RequestQueue.front();
             clientSocket = socket;
