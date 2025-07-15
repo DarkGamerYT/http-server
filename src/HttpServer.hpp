@@ -24,6 +24,7 @@
 #include <regex>
 #include <variant>
 #include <filesystem>
+#include <map>
 
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
@@ -48,7 +49,7 @@ private:
     Socket_t m_ServerSocket{ 0 };
     sockaddr_in m_SocketAddress{};
 
-    std::unordered_map<std::string, RouteHandlers_t> m_Routes;
+    std::map<std::string, RouteHandlers_t> m_Routes;
 
 public:
 	HttpServer();

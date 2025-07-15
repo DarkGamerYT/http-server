@@ -1,4 +1,5 @@
 #include "HttpResponse.hpp"
+#include <iostream>
 
 bool HttpResponse::send(std::string data)
 {
@@ -105,7 +106,7 @@ bool HttpResponse::sendToSocket(const std::string& data)
 
         totalBytesSent += bytesSent;
     };
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
     long bytesSent = ::write(this->m_ClientSocket, data.c_str(), data.size());
 #endif
 

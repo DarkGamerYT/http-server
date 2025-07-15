@@ -15,7 +15,9 @@ HttpServer::HttpServer()
 
 HttpServer::~HttpServer()
 {
-    this->close();
+    try {
+        this->close();
+    } catch (...) {};
 };
 
 void HttpServer::listen(unsigned short port)
@@ -38,19 +40,25 @@ void HttpServer::close()
 {
     this->m_bIsRunning = false;
 
-#if defined(_WIN32)
-    closesocket(this->m_ServerSocket);
-    WSACleanup();
-#elif defined(__unix__)
-    ::close(this->m_ServerSocket);
-#endif
+    if (this->m_ServerSocket != -1) {
+    #if defined(_WIN32)
+        closesocket(this->m_ServerSocket);
+        WSACleanup();
+    #elif defined(__unix__) || defined(__APPLE__)
+        ::close(this->m_ServerSocket);
+    #endif
+    };
 };
 
 void HttpServer::listen()
 {
-#if defined(__unix__)
+#if defined(__unix__) || defined(__APPLE__)
     int opt = 1;
+  #if defined(__APPLE__)
+    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+  #else
     if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0)
+  #endif
     {
         throw std::runtime_error("Failed to set socket options");
     };
@@ -114,8 +122,8 @@ void HttpServer::proccessRequests(int workerId)
         std::vector<char> buffer(s_MaxBufferSize);
     #if defined(_WIN32)
         int bytesReceived = recv(clientSocket, buffer.data(), static_cast<int>(buffer.size()), 0);
-    #elif defined(__unix__)
-        int bytesReceived = read(clientSocket, buffer.data(), buffer.size());
+    #elif defined(__unix__) || defined(__APPLE__)
+        ssize_t bytesReceived = read(clientSocket, buffer.data(), buffer.size());
     #endif
 
         if (bytesReceived < 1)

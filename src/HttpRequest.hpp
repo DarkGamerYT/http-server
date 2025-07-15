@@ -8,13 +8,15 @@
 #if defined(_WIN32)
     #include <WinSock2.h>
     #include <ws2tcpip.h>
-#elif defined(__linux__)
+#elif defined(__unix__) || defined(__APPLE__)
     #include <unistd.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
 #endif
 
 #if defined(_WIN32)
     typedef SOCKET Socket_t;
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
     typedef int Socket_t;
 #endif
 

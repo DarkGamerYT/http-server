@@ -1,4 +1,5 @@
 /.vs
+/.DS_STORE
 /build
 /out
 /vcpkg_installed
