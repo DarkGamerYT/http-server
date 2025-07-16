@@ -9,9 +9,10 @@
     #include <WinSock2.h>
     #include <ws2tcpip.h>
     #pragma comment(lib, "Ws2_32.lib")
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
     #include <sys/socket.h>
     #include <netinet/in.h>
+    #include <netinet/tcp.h>
     #include <arpa/inet.h>
     #include <unistd.h>
 #endif

@@ -75,20 +75,28 @@ void HttpServer::close()
 void HttpServer::listen()
 {
     int opt = 1;
-    if (setsockopt(
-        this->m_ServerSocket,
-        IPPROTO_TCP,
-        SO_REUSEADDR | TCP_NODELAY,
-
+    // SO_REUSEADDR
 #if defined(_WIN32)
-        reinterpret_cast<const char*>(&opt),
+    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR,
+                   reinterpret_cast<const char*>(&opt), sizeof(opt)) < 0)
 #elif defined(__unix__) || defined(__APPLE__)
-        &opt,
+    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR,
+                   &opt, sizeof(opt)) < 0)
 #endif
+    {
+        throw std::runtime_error("Failed to set SO_REUSEADDR");
+    };
 
-        sizeof(opt)
-    ) < 0) {
-        throw std::runtime_error("Failed to set socket options");
+    // TCP_NODELAY
+#if defined(_WIN32)
+    if (setsockopt(this->m_ServerSocket, IPPROTO_TCP, TCP_NODELAY,
+                   reinterpret_cast<const char*>(&opt), sizeof(opt)) < 0)
+#elif defined(__unix__) || defined(__APPLE__)
+    if (setsockopt(this->m_ServerSocket, IPPROTO_TCP, TCP_NODELAY,
+                   &opt, sizeof(opt)) < 0)
+#endif
+    {
+        throw std::runtime_error("Failed to set TCP_NODELAY");
     };
 
     if (bind(this->m_ServerSocket, reinterpret_cast<sockaddr *>(&m_SocketAddress), sizeof(m_SocketAddress)) < 0)
