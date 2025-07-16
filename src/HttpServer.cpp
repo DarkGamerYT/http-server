@@ -5,13 +5,14 @@ HttpServer::HttpServer()
 {
 #if defined(_WIN32)
     WSADATA m_wsaData;
-    (void)WSAStartup(MAKEWORD(2, 0), &m_wsaData);
+    if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0) {
+        throw std::runtime_error("WSAStartup failed");
+    };
 #endif
 
     this->m_ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (this->m_ServerSocket < 0)
-    {
-        throw std::runtime_error("Failed to create a socket");
+    if (this->m_ServerSocket < 0) {
+        throw std::runtime_error("Failed to create socket");
     };
 };
 
@@ -25,6 +26,7 @@ HttpServer::~HttpServer()
 void HttpServer::listen(unsigned short port)
 {
     this->m_SocketAddress.sin_port = htons(port);
+    this->m_SocketAddress.sin_family = AF_INET;
     this->m_SocketAddress.sin_addr.s_addr = INADDR_ANY;
 
     this->listen();
@@ -33,6 +35,7 @@ void HttpServer::listen(unsigned short port)
 void HttpServer::listen(const char* address, unsigned short port)
 {
     this->m_SocketAddress.sin_port = htons(port);
+    this->m_SocketAddress.sin_family = AF_INET;
     inet_pton(AF_INET, address, &(this->m_SocketAddress.sin_addr.s_addr));
 
     this->listen();
@@ -71,15 +74,23 @@ void HttpServer::close()
 
 void HttpServer::listen()
 {
-#if defined(__unix__) || defined(__APPLE__)
     int opt = 1;
-    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-    {
-        throw std::runtime_error("Failed to set socket options");
-    };
+    if (setsockopt(
+        this->m_ServerSocket,
+        IPPROTO_TCP,
+        SO_REUSEADDR | TCP_NODELAY,
+
+#if defined(_WIN32)
+        reinterpret_cast<const char*>(&opt),
+#elif defined(__unix__) || defined(__APPLE__)
+        &opt,
 #endif
 
-    this->m_SocketAddress.sin_family = AF_INET;
+        sizeof(opt)
+    ) < 0) {
+        throw std::runtime_error("Failed to set socket options");
+    };
+
     if (bind(this->m_ServerSocket, reinterpret_cast<sockaddr *>(&m_SocketAddress), sizeof(m_SocketAddress)) < 0)
     {
         throw std::runtime_error("Failed to bind to socket");
@@ -156,23 +167,21 @@ void HttpServer::proccessRequests(int workerId)
         const std::string& path = request.getPath();
         const auto& method = request.getMethod();
 
-        bool bExists = false;
         RouteHandlers_t handlers{};
+        bool bExists = false;
         for (const auto& [route, data] : m_Routes)
         {
+            bool matches = false;
             try {
                 std::regex pattern{ route };
-                if (!std::regex_match(path, pattern))
-                {
-                    continue;
-                };
+                matches = std::regex_match(path, pattern);
             }
-            catch (const std::regex_error&) {
-                if (route != path)
-                {
-                    continue;
-                };
+            catch (...) {
+                matches = (route == path);
             };
+
+            if (false == matches)
+                continue;
 
             bExists = true;
             handlers = data;
@@ -180,15 +189,8 @@ void HttpServer::proccessRequests(int workerId)
             break;
         };
 
-        if (false == bExists)
-        {
+        if (false == bExists || !handlers.contains(method))
             continue;
-        };
-
-        if (!handlers.contains(method))
-        {
-            continue;
-        };
 
         const RequestHandler_t& handler = handlers.at(method);
         handler(request, { clientSocket, request });
@@ -207,7 +209,7 @@ inline std::string extractPrefix(const std::string& regexPath)
 {
     size_t i = 0;
     while (i < regexPath.size()) {
-        char character = regexPath[i];
+        const char character = regexPath[i];
         if (
             std::isalnum(character)
             || character == '^'

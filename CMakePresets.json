@@ -11,8 +11,8 @@
             "name": "default",
             "generator": "Ninja",
             "displayName": "Default Config",
-            "binaryDir": "${sourceDir}/build",
-            "installDir": "${sourceDir}/build/install"
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/build/install/${presetName}"
         },
 
         {

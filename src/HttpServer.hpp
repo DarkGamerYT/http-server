@@ -1,6 +1,10 @@
 #ifndef HTTPSERVER_HPP
 #define HTTPSERVER_HPP
 
+#ifndef NOMINMAX
+    #define NOMINMAX
+#endif /* NOMINMAX */
+
 #if defined(_WIN32)
     #include <WinSock2.h>
     #include <ws2tcpip.h>
