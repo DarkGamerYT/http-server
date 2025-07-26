@@ -31,3 +31,23 @@ If built successfully, a static library with the name `web-server.lib` should be
 ## Features
 - [ ] Caching
 - [ ] SSL Support
+
+## License
+This project is open-source under the **MIT License**. Feel free to modify and contribute!  
+
+## Contributing
+```shell
+# Fork the repository
+git clone https://github.com/DarkGamerYT/http-server.git
+
+# Create a new branch
+git checkout -b feature-branch
+
+# Commit your changes
+git commit -m "Added new feature"
+
+# Push to GitHub
+git push origin feature-branch
+
+# Submit a Pull Request
+```
