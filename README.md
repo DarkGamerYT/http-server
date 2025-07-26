@@ -4,8 +4,6 @@
   A simple HTTP server made using C++.
 </div>
 
-<img src=".github/img/http.screenshot.png" />
-
 ## Library Usage Examples
 ```cpp
 #include "HttpServer.hpp"
@@ -21,6 +19,8 @@ int main(int argc, char* argv[])
     g_Server.listen(8080);
 };
 ```
+
+<img src=".github/img/http.screenshot.png" />
 
 ## Building
 - Install [CMake](https://cmake.org/download)
