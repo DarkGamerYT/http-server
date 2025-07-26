@@ -1,5 +1,12 @@
-A simple HTTP server made using C++.
+<div align="center">
 
+  # http-server
+  A simple HTTP server made using C++.
+</div>
+
+<img src=".github/img/http.screenshot.png" />
+
+## Library Usage Examples
 ```cpp
 #include "HttpServer.hpp"
 
