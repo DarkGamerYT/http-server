@@ -18,9 +18,9 @@ public:
 };
 
 struct WebSocketHandler {
-    std::function<void(WebSocket&)> onOpen;
-    std::function<void(WebSocket&, const std::string&)> onMessage;
-    std::function<void(WebSocket&)> onClose;
+    std::function<void(WebSocket&)> onOpen = [] (WebSocket&) {};
+    std::function<void(WebSocket&, const std::string&)> onMessage = [] (WebSocket&, const std::string&) {};
+    std::function<void(WebSocket&)> onClose = [] (WebSocket&) {};
 };
 
 #endif //WEBSOCKET_HPP
