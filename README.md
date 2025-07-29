@@ -5,6 +5,7 @@
 </div>
 
 ## Library Usage Examples
+Refer to [src-examples](./src-examples) for more examples
 ```cpp
 #include "HttpServer.hpp"
 
@@ -29,6 +30,7 @@ int main(int argc, char* argv[])
 If built successfully, a static library with the name `web-server.lib` should be found inside `build/Release` directory.
 
 ## Features
+- [x] WebSockets
 - [ ] Caching
 - [ ] SSL Support
 
