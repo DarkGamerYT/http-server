@@ -192,7 +192,7 @@ void HttpServer::proccessRequests(int workerId)
 
         RouteHandlers_t handlers{};
         bool bExists = false;
-        for (const auto& [route, data] : mRoutes)
+        for (const auto& route : this->mRoutes | std::views::keys)
         {
             bool matches = false;
             try {
@@ -203,13 +203,13 @@ void HttpServer::proccessRequests(int workerId)
                 matches = (route == path);
             };
 
-            if (false == matches)
-                continue;
-
-            bExists = true;
-            handlers = data;
-            request.setOriginalPath(route);
-            break;
+            if (true == matches)
+            {
+                bExists = true;
+                handlers = this->mRoutes.at(route);
+                request.setOriginalPath(route);
+                break;
+            };
         };
 
         if (false == bExists || !handlers.contains(method))
@@ -266,7 +266,7 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
             response.setHeader("Content-Type", "text/plain");
             response.send("Not Found");
             return;
-        }
+        };
 
         std::string relative = fullPath.substr(routePrefix.length());
         if (!relative.empty() && relative.front() == '/')
@@ -305,8 +305,30 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
 
 void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer) {
     const auto& path = request.getPath();
+
+    WebSocketHandler handlers;
+    bool bExists = false;
+    for (const auto& route: this->mSockets | std::views::keys)
+    {
+        bool matches = false;
+        try {
+            std::regex pattern{ route };
+            matches = std::regex_match(path, pattern);
+        }
+        catch (...) {
+            matches = (route == path);
+        };
+
+        if (true == matches)
+        {
+            bExists = true;
+            handlers = this->mSockets.at(route);
+            break;
+        };
+    };
+
     if (request.getMethod() != HttpMethod::GET
-        || !this->mSockets.contains(path))
+        || false == bExists)
     {
 #if defined(_WIN32)
         ::closesocket(socket);
@@ -320,7 +342,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     HttpServer::upgradeWebSocket(socket, request, key);
 
     WebSocket webSocket{ socket };
-    const auto& [onOpen, onMessage, onClose] = this->mSockets.at(path);
+    const auto& [onOpen, onMessage, onClose] = handlers;
     onOpen(webSocket);
 
     std::string fragmentBuffer;
@@ -354,7 +376,8 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
 
             payloadSize = (static_cast<size_t>(buffer[2]) << 8) | buffer[3];
             offset += 2;
-        } else if (lengthCode == 127) {
+        }
+        else if (lengthCode == 127) {
             if (received < 10)
                 continue;
 

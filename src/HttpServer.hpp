@@ -31,6 +31,7 @@
 #include <regex>
 #include <variant>
 #include <array>
+#include <ranges>
 #include <filesystem>
 #include <map>
 

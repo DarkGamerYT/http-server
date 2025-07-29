@@ -22,7 +22,6 @@ void WebSocket::send(const std::string& data) const {
     };
 
     frame += data;
-
     HttpServer::sendToSocket(this->mClientSocket, frame);
 };
 
