@@ -17,7 +17,6 @@ public:
     void closeSocket() const;
 };
 
-
 struct WebSocketHandler {
     std::function<void(WebSocket&)> onOpen;
     std::function<void(WebSocket&, const std::string&)> onMessage;

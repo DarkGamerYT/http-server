@@ -161,9 +161,9 @@ void HttpServer::proccessRequests(int workerId)
             m_RequestQueue.pop();
         };
 
-        std::vector<char> buffer(s_MaxBufferSize);
+        std::vector<uint8_t> buffer(s_MaxBufferSize);
     #if defined(_WIN32)
-        int bytesReceived = recv(clientSocket, buffer.data(), static_cast<int>(buffer.size()), 0);
+        int bytesReceived = recv(clientSocket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
     #elif defined(__unix__) || defined(__APPLE__)
         ssize_t bytesReceived = read(clientSocket, buffer.data(), buffer.size());
     #endif
@@ -171,7 +171,7 @@ void HttpServer::proccessRequests(int workerId)
         if (bytesReceived < 1)
             return;
 
-        std::string data(buffer.data(), bytesReceived);
+        std::string data(reinterpret_cast<const char*>(buffer.data()), bytesReceived);
         HttpRequest request{ clientSocket, data };
 
         const std::string& path = request.getPath();
@@ -308,7 +308,7 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
     };
 };
 
-void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<char>& buffer) {
+void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer) {
     const auto& path = request.getPath();
     if (request.getMethod() != HttpMethod::GET
         || !this->m_Sockets.contains(path))
@@ -328,10 +328,12 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     const auto&[onOpen, onMessage, onClose] = this->m_Sockets.at(path);
     onOpen(webSocket);
 
+    std::string fragmentBuffer;
+    bool isFragmented = false;
     while (true)
     {
 #if defined(_WIN32)
-        int received = recv(socket, buffer.data(), static_cast<int>(buffer.size()), 0);
+        int received = recv(socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
 #elif defined(__unix__) || defined(__APPLE__)
         ssize_t received = read(socket, buffer.data(), buffer.size());
 #endif
@@ -339,22 +341,85 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
         if (received <= 0)
             break;
 
-        if ((buffer[0] & 0x0F) == 0x8) {
+        const uint8_t opcode = buffer[0] & 0x0F;
+        if (opcode == 0x8) {
             onClose(webSocket);
-            HttpServer::sendToSocket(socket, std::string("\x88\x00", 2));
+            HttpServer::sendToSocket(socket, std::string{ static_cast<char>(0x88), 0x00 });
             break;
         };
 
+        bool isFinal = buffer[0] & 0x80;
+        uint8_t lengthCode = buffer[1] & 0x7F;
+
+        size_t payloadSize = lengthCode;
+        size_t offset = 2;
+        if (lengthCode == 126) {
+            if (received < 4)
+                continue;
+
+            payloadSize = (static_cast<size_t>(buffer[2]) << 8) | buffer[3];
+            offset += 2;
+        } else if (lengthCode == 127) {
+            if (received < 10)
+                continue;
+
+            payloadSize = 0;
+            for (int i = 0; i < 8; ++i)
+                payloadSize = (payloadSize << 8) | static_cast<size_t>(buffer[2 + i]);
+
+            offset += 8;
+        };
+
+        if (buffer.size() < offset + 4 + payloadSize)
+            continue; // Wait for more data
+
         std::array<uint8_t, 4> maskingKey{};
-        std::copy(buffer.data() + 2, buffer.data() + 6, maskingKey.begin());
+        std::copy_n(buffer.data() + offset, 4, maskingKey.begin());
+        offset += 4;
 
         // Decode payload
         std::string message;
-        const uint8_t payloadSize = buffer[1] & 0x7F;
-        for (size_t i = 0; i < payloadSize; ++i)
-            message += static_cast<char>(buffer[6 + i] ^ maskingKey[i % 4]);
+        message.reserve(payloadSize);
 
-        onMessage(webSocket, message);
+        for (size_t i = 0; i < payloadSize; ++i)
+            message += static_cast<char>(buffer[offset + i] ^ maskingKey[i % 4]);
+
+        switch (opcode)
+        {
+            case 0x1: {
+                // Text frame - possibly fragmented
+                if (!isFinal)
+                {
+                    fragmentBuffer = message;
+                    isFragmented = true;
+                    continue;
+                };
+
+                onMessage(webSocket, message);
+                break;
+            };
+
+            case 0x0: {
+                // Continuation frame
+                if (!isFragmented)
+                    continue; // Unexpected continuation
+
+                fragmentBuffer += message;
+
+                if (isFinal)
+                {
+                    onMessage(webSocket, fragmentBuffer);
+                    fragmentBuffer.clear();
+                    isFragmented = false;
+                };
+
+                break;
+            };
+
+            default:
+                // Unsupported opcode (e.g., binary or ping)
+                break;
+        };
     };
 };
 

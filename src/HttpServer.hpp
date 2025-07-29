@@ -87,7 +87,7 @@ private:
     void proccessRequests(int workerId);
 
     static bool isUpgradeRequest(const HttpRequest& request);
-    void upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<char>& buffer);
+    void upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer);
     static void upgradeWebSocket(Socket_t socket, const HttpRequest& request, std::string& key);
 };
 
