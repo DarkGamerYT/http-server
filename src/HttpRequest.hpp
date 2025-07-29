@@ -29,30 +29,30 @@ class HttpRequest
     friend class HttpServer;
 
 private:
-    std::string m_Path, m_Body;
-    HttpMethod::Method m_Method;
-    HttpVersion::Version m_Version;
-    HeadersMap_t m_Headers;
+    std::string mPath, mBody;
+    HttpMethod::Method mMethod;
+    HttpVersion::Version mVersion;
+    HeadersMap_t mHeaders;
 
 protected:
-    Socket_t m_ClientSocket;
-    std::string m_OriginalPath;
+    Socket_t mClientSocket;
+    std::string mOriginalPath;
 
 public:
     HttpRequest(Socket_t clientSocket, const std::string& data);
     ~HttpRequest() = default;
 
-    const std::string& getPath() const { return this->m_Path; };
-    const std::string& getOriginalPath() const { return this->m_OriginalPath; };
-    const std::string& getBody() const { return this->m_Body; };
-    const HeadersMap_t& getHeaders() const { return this->m_Headers; };
+    const std::string& getPath() const { return this->mPath; };
+    const std::string& getOriginalPath() const { return this->mOriginalPath; };
+    const std::string& getBody() const { return this->mBody; };
+    const HeadersMap_t& getHeaders() const { return this->mHeaders; };
 
     std::string getRemoteAddr() const;
-    HttpMethod::Method getMethod() const { return this->m_Method; };
-    HttpVersion::Version getVersion() const { return this->m_Version; };
+    HttpMethod::Method getMethod() const { return this->mMethod; };
+    HttpVersion::Version getVersion() const { return this->mVersion; };
 
 private:
-    void setOriginalPath(const std::string& path) { this->m_OriginalPath = path; };
+    void setOriginalPath(const std::string& path) { this->mOriginalPath = path; };
 };
 
 #endif // !HTTPREQUEST_HPP

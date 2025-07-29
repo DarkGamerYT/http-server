@@ -1,19 +1,19 @@
 #include "HttpServer.hpp"
 
-unsigned int HttpServer::s_MaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());
+unsigned int HttpServer::sMaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());
 HttpServer::HttpServer(bool enableWebSockets)
 {
-    this->m_bEnableWebSockets = enableWebSockets;
+    this->b_mEnableWebSockets = enableWebSockets;
 
 #if defined(_WIN32)
-    WSADATA m_wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0) {
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         throw std::runtime_error("WSAStartup failed");
     };
 #endif
 
-    this->m_ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (this->m_ServerSocket < 0) {
+    this->mServerSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (this->mServerSocket < 0) {
         throw std::runtime_error("Failed to create socket");
     };
 };
@@ -27,51 +27,51 @@ HttpServer::~HttpServer()
 
 void HttpServer::listen(unsigned short port)
 {
-    this->m_SocketAddress.sin_port = htons(port);
-    this->m_SocketAddress.sin_family = AF_INET;
-    this->m_SocketAddress.sin_addr.s_addr = INADDR_ANY;
+    this->mSocketAddress.sin_port = htons(port);
+    this->mSocketAddress.sin_family = AF_INET;
+    this->mSocketAddress.sin_addr.s_addr = INADDR_ANY;
 
     this->listen();
 };
 
 void HttpServer::listen(const char* address, unsigned short port)
 {
-    this->m_SocketAddress.sin_port = htons(port);
-    this->m_SocketAddress.sin_family = AF_INET;
-    inet_pton(AF_INET, address, &(this->m_SocketAddress.sin_addr.s_addr));
+    this->mSocketAddress.sin_port = htons(port);
+    this->mSocketAddress.sin_family = AF_INET;
+    inet_pton(AF_INET, address, &(this->mSocketAddress.sin_addr.s_addr));
 
     this->listen();
 };
 
 void HttpServer::close()
 {
-    if (!this->m_bIsRunning)
+    if (!this->b_mIsRunning)
         return;
     
-    this->m_bIsRunning = false;
+    this->b_mIsRunning = false;
     
     // Notify all waiting threads to wake up and exit
-    m_QueueCondVar.notify_all();
+    mQueueCondVar.notify_all();
 
     // Join all worker threads
-    for (auto& thread : m_WorkerThreads) {
+    for (auto& thread : mWorkerThreads) {
         if (!thread.joinable())
             continue;
         
         thread.join();
     };
     
-    if (this->m_ServerSocket == -1)
+    if (this->mServerSocket == -1)
         return;
 
 #if defined(_WIN32)
-    closesocket(this->m_ServerSocket);
+    closesocket(this->mServerSocket);
     WSACleanup();
 #elif defined(__unix__) || defined(__APPLE__)
-    ::close(this->m_ServerSocket);
+    ::close(this->mServerSocket);
 #endif
         
-    this->m_ServerSocket = -1;
+    this->mServerSocket = -1;
 };
 
 void HttpServer::listen()
@@ -79,10 +79,10 @@ void HttpServer::listen()
     int opt = 1;
     // SO_REUSEADDR
 #if defined(_WIN32)
-    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR,
+    if (setsockopt(this->mServerSocket, SOL_SOCKET, SO_REUSEADDR,
                    reinterpret_cast<const char*>(&opt), sizeof(opt)) < 0)
 #elif defined(__unix__) || defined(__APPLE__)
-    if (setsockopt(this->m_ServerSocket, SOL_SOCKET, SO_REUSEADDR,
+    if (setsockopt(this->mServerSocket, SOL_SOCKET, SO_REUSEADDR,
                    &opt, sizeof(opt)) < 0)
 #endif
     {
@@ -91,31 +91,31 @@ void HttpServer::listen()
 
     // TCP_NODELAY
 #if defined(_WIN32)
-    if (setsockopt(this->m_ServerSocket, IPPROTO_TCP, TCP_NODELAY,
+    if (setsockopt(this->mServerSocket, IPPROTO_TCP, TCP_NODELAY,
                    reinterpret_cast<const char*>(&opt), sizeof(opt)) < 0)
 #elif defined(__unix__) || defined(__APPLE__)
-    if (setsockopt(this->m_ServerSocket, IPPROTO_TCP, TCP_NODELAY,
+    if (setsockopt(this->mServerSocket, IPPROTO_TCP, TCP_NODELAY,
                    &opt, sizeof(opt)) < 0)
 #endif
     {
         throw std::runtime_error("Failed to set TCP_NODELAY");
     };
 
-    if (bind(this->m_ServerSocket, reinterpret_cast<sockaddr *>(&m_SocketAddress), sizeof(m_SocketAddress)) < 0)
+    if (bind(this->mServerSocket, reinterpret_cast<sockaddr *>(&mSocketAddress), sizeof(mSocketAddress)) < 0)
     {
         throw std::runtime_error("Failed to bind to socket");
     };
 
-    if (::listen(this->m_ServerSocket, s_MaxConnections) < 0)
+    if (::listen(this->mServerSocket, sMaxConnections) < 0)
     {
         throw std::runtime_error("Failed to listen");
     };
 
-    this->m_bIsRunning = true;
+    this->b_mIsRunning = true;
     
-    m_WorkerThreads.resize(s_MaxWorkerThreads);
-    for (auto i = 0; i < s_MaxWorkerThreads; i++) {
-        m_WorkerThreads[i] = std::thread(&HttpServer::proccessRequests, this, i);
+    mWorkerThreads.resize(sMaxWorkerThreads);
+    for (auto i = 0; i < sMaxWorkerThreads; i++) {
+        mWorkerThreads[i] = std::thread(&HttpServer::proccessRequests, this, i);
     };
 
     this->receiveConnections();
@@ -123,45 +123,45 @@ void HttpServer::listen()
 
 void HttpServer::receiveConnections()
 {
-    while (this->m_bIsRunning)
+    while (this->b_mIsRunning)
     {
         sockaddr_in clientAddress{};
         socklen_t addressLength = sizeof(clientAddress);
 
-        Socket_t clientSocket = accept(this->m_ServerSocket, reinterpret_cast<struct sockaddr *>(&clientAddress), &addressLength);
+        Socket_t clientSocket = accept(this->mServerSocket, reinterpret_cast<struct sockaddr *>(&clientAddress), &addressLength);
         if (clientSocket < 0)
             continue;
 
         {
-            std::unique_lock lock(m_QueueMutex);
-            m_RequestQueue.emplace(clientSocket, clientAddress);
+            std::unique_lock lock(mQueueMutex);
+            mRequestQueue.emplace(clientSocket, clientAddress);
         };
-        m_QueueCondVar.notify_one(); // Wake up one waiting worker
+        mQueueCondVar.notify_one(); // Wake up one waiting worker
     };
 };
 
 void HttpServer::proccessRequests(int workerId)
 {
-    while (this->m_bIsRunning)
+    while (this->b_mIsRunning)
     {
         sockaddr_in clientAddress{};
         Socket_t clientSocket;
         {
-            std::unique_lock lock(m_QueueMutex);
-            m_QueueCondVar.wait(lock, [this] {
-                return !m_RequestQueue.empty() || !m_bIsRunning;
+            std::unique_lock lock(mQueueMutex);
+            mQueueCondVar.wait(lock, [this] {
+                return !mRequestQueue.empty() || !b_mIsRunning;
             });
             
-            if (!m_bIsRunning && m_RequestQueue.empty())
+            if (!b_mIsRunning && mRequestQueue.empty())
                 break;
 
-            const auto& [ socket, address ] = m_RequestQueue.front();
+            const auto& [ socket, address ] = mRequestQueue.front();
             clientSocket = socket;
             clientAddress = address;
-            m_RequestQueue.pop();
+            mRequestQueue.pop();
         };
 
-        std::vector<uint8_t> buffer(s_MaxBufferSize);
+        std::vector<uint8_t> buffer(sMaxBufferSize);
     #if defined(_WIN32)
         int bytesReceived = recv(clientSocket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
     #elif defined(__unix__) || defined(__APPLE__)
@@ -179,24 +179,20 @@ void HttpServer::proccessRequests(int workerId)
 
         if (HttpServer::isUpgradeRequest(request))
         {
-            if (this->m_bEnableWebSockets)
-            {
+            if (this->b_mEnableWebSockets)
                 HttpServer::upgradeConnection(clientSocket, request, buffer);
-            }
-            else
-            {
-            #if defined(_WIN32)
-                ::closesocket(clientSocket);
-            #elif defined(__unix__) || defined(__APPLE__)
-                ::close(clientSocket);
-            #endif
-            };
+
+        #if defined(_WIN32)
+            ::closesocket(clientSocket);
+        #elif defined(__unix__) || defined(__APPLE__)
+            ::close(clientSocket);
+        #endif
             return;
         };
 
         RouteHandlers_t handlers{};
         bool bExists = false;
-        for (const auto& [route, data] : m_Routes)
+        for (const auto& [route, data] : mRoutes)
         {
             bool matches = false;
             try {
@@ -227,13 +223,13 @@ void HttpServer::proccessRequests(int workerId)
 void HttpServer::use(const std::string& route, HttpMethod::Method method,
     const RequestHandler_t& callback)
 {
-    this->m_Routes[route].insert(
+    this->mRoutes[route].insert(
         std::make_pair(method, callback)
     );
 };
 
 void HttpServer::websocket(const std::string &route, const WebSocketHandler& handler) {
-    this->m_Sockets[route] = handler;
+    this->mSockets[route] = handler;
 };
 
 
@@ -241,8 +237,7 @@ inline std::string extractPrefix(const std::string& regexPath)
 {
     size_t i = 0;
     while (i < regexPath.size()) {
-        const char character = regexPath[i];
-        if (
+        if (const char character = regexPath[i];
             std::isalnum(character)
             || character == '^'
             || character == '/'
@@ -311,7 +306,7 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
 void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer) {
     const auto& path = request.getPath();
     if (request.getMethod() != HttpMethod::GET
-        || !this->m_Sockets.contains(path))
+        || !this->mSockets.contains(path))
     {
 #if defined(_WIN32)
         ::closesocket(socket);
@@ -325,7 +320,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     HttpServer::upgradeWebSocket(socket, request, key);
 
     WebSocket webSocket{ socket };
-    const auto&[onOpen, onMessage, onClose] = this->m_Sockets.at(path);
+    const auto& [onOpen, onMessage, onClose] = this->mSockets.at(path);
     onOpen(webSocket);
 
     std::string fragmentBuffer;

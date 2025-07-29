@@ -47,23 +47,23 @@ typedef std::unordered_map<HttpMethod::Method, RequestHandler_t> RouteHandlers_t
 class HttpServer
 {
 private:
-    static constexpr int s_MaxConnections = 1024;
-    static constexpr int s_MaxBufferSize = 65536;
-    static unsigned int s_MaxWorkerThreads;
+    static constexpr int sMaxConnections = 1024;
+    static constexpr int sMaxBufferSize = 65536;
+    static unsigned int sMaxWorkerThreads;
 
-    bool m_bEnableWebSockets = false;
-    bool m_bIsRunning = false;
-    std::vector<std::thread> m_WorkerThreads;
-    std::queue<std::pair<Socket_t, sockaddr_in>> m_RequestQueue;
-    std::mutex m_QueueMutex;
-    std::condition_variable m_QueueCondVar;
+    bool b_mEnableWebSockets = false;
+    bool b_mIsRunning = false;
+    std::vector<std::thread> mWorkerThreads;
+    std::queue<std::pair<Socket_t, sockaddr_in>> mRequestQueue;
+    std::mutex mQueueMutex;
+    std::condition_variable mQueueCondVar;
 
 protected:
-    Socket_t m_ServerSocket{ 0 };
-    sockaddr_in m_SocketAddress{};
+    Socket_t mServerSocket{ 0 };
+    sockaddr_in mSocketAddress{};
 
-    std::map<std::string, RouteHandlers_t> m_Routes;
-    std::map<std::string, WebSocketHandler> m_Sockets;
+    std::map<std::string, RouteHandlers_t> mRoutes;
+    std::map<std::string, WebSocketHandler> mSockets;
 
 public:
 	explicit HttpServer(bool enableWebSockets = false);

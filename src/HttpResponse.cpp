@@ -3,16 +3,16 @@
 
 bool HttpResponse::send(std::string data)
 {
-    if (!this->m_Headers.contains("Content-Type"))
+    if (!this->mHeaders.contains("Content-Type"))
         this->setHeader("Content-Type", "text/html");
 
     size_t length = data.length();
     this->setHeader("Content-Length", std::to_string(length));
 
     if (
-        (this->m_StatusCode >= 100 && this->m_StatusCode < 200)
-        || HttpStatus::NoContent == this->m_StatusCode
-        || HttpStatus::NotModified == this->m_StatusCode
+        (this->mStatusCode >= 100 && this->mStatusCode < 200)
+        || HttpStatus::NoContent == this->mStatusCode
+        || HttpStatus::NotModified == this->mStatusCode
     ) {
         this->removeHeader("Content-Type");
         this->removeHeader("Content-Length");
@@ -20,14 +20,13 @@ bool HttpResponse::send(std::string data)
         data = "";
     };
 
-    if (HttpStatus::ResetContent == this->m_StatusCode) {
+    if (HttpStatus::ResetContent == this->mStatusCode) {
         this->removeHeader("Transfer-Encoding");
         data = "";
     };
 
     std::ostringstream stream = this->toHttpString();
-    const auto& requestMethod = this->m_Request.getMethod();
-    if (
+    if (const auto& requestMethod = this->mRequest.getMethod();
         requestMethod != HttpMethod::HEAD &&
         requestMethod != HttpMethod::CONNECT
     ) {
@@ -39,7 +38,7 @@ bool HttpResponse::send(std::string data)
 
 bool HttpResponse::sendStatus(HttpStatus::Code status)
 {
-    this->m_StatusCode = status;
+    this->mStatusCode = status;
     return this->send("");
 };
 
@@ -62,8 +61,8 @@ bool HttpResponse::sendFile(const std::filesystem::path& path)
 
 bool HttpResponse::redirect(const std::string& location)
 {
-    if (this->m_StatusCode < 300 || this->m_StatusCode >= 400)
-        this->m_StatusCode = HttpStatus::Found;
+    if (this->mStatusCode < 300 || this->mStatusCode >= 400)
+        this->mStatusCode = HttpStatus::Found;
 
     this->setHeader("Location", location);
 
@@ -73,14 +72,14 @@ bool HttpResponse::redirect(const std::string& location)
 
 std::ostringstream HttpResponse::toHttpString()
 {
-    std::string statusMessage = HttpStatus::toString(this->m_StatusCode);
+    std::string statusMessage = HttpStatus::toString(this->mStatusCode);
 
     std::ostringstream stream;
     stream
-        << "HTTP/1.1 " << std::to_string(this->m_StatusCode)
+        << "HTTP/1.1 " << std::to_string(this->mStatusCode)
         << " " << statusMessage << "\r\n";
 
-    for (const auto& [key, value] : this->m_Headers)
+    for (const auto& [key, value] : this->mHeaders)
         stream << key << ": " << value << "\r\n";
     return stream;
 };
@@ -93,13 +92,13 @@ void HttpResponse::setHeaders(const std::unordered_map<std::string, std::string>
 
 bool HttpResponse::sendToSocket(const std::string& data)
 {
-    if (true == this->m_HeadersSent)
+    if (true == this->mHeadersSent)
         return false;
 
-    HttpServer::sendToSocket(this->m_ClientSocket, data);
+    HttpServer::sendToSocket(this->mClientSocket, data);
 
-    this->m_HeadersSent = true;
-    if (this->m_ShouldClose)
+    this->mHeadersSent = true;
+    if (this->mShouldClose)
         this->closeSocket();
     return true;
 };
@@ -107,8 +106,8 @@ bool HttpResponse::sendToSocket(const std::string& data)
 void HttpResponse::closeSocket() const
 {
 #if defined(_WIN32)
-    ::closesocket(this->m_ClientSocket);
+    ::closesocket(this->mClientSocket);
 #elif defined(__unix__) || defined(__APPLE__)
-    ::close(this->m_ClientSocket);
+    ::close(this->mClientSocket);
 #endif
 };

@@ -10,34 +10,34 @@
 class HttpResponse
 {
 private:
-    bool m_HeadersSent = false;
-    HttpStatus::Code m_StatusCode = HttpStatus::OK;
-    HeadersMap_t m_Headers;
+    bool mHeadersSent = false;
+    HttpStatus::Code mStatusCode = HttpStatus::OK;
+    HeadersMap_t mHeaders;
 
 protected:
-    Socket_t m_ClientSocket;
-    HttpRequest m_Request;
-    bool m_ShouldClose = true;
+    Socket_t mClientSocket;
+    HttpRequest mRequest;
+    bool mShouldClose = true;
 
 public:
     HttpResponse(Socket_t clientSocket, const HttpRequest& req, bool shouldClose = true) :
-        m_ClientSocket(clientSocket),
-        m_Request(req),
-        m_ShouldClose(shouldClose) {};
+        mClientSocket(clientSocket),
+        mRequest(req),
+        mShouldClose(shouldClose) {};
 
-    HttpResponse& setStatus(HttpStatus::Code status) { this->m_StatusCode = status; return *this; };
+    HttpResponse& setStatus(HttpStatus::Code status) { this->mStatusCode = status; return *this; };
 
     bool send(std::string data = "");
     bool sendStatus(HttpStatus::Code status);
     bool sendFile(const std::filesystem::path& path);
     bool redirect(const std::string& location);
 
-    const std::string& getHeader(const std::string& key) { return this->m_Headers[key]; };
-    void setHeader(const std::string& key, const std::string& value) { this->m_Headers[key] = value; };
-    bool removeHeader(const std::string& key) { return this->m_Headers.erase(key) != 0; };
+    const std::string& getHeader(const std::string& key) { return this->mHeaders[key]; };
+    void setHeader(const std::string& key, const std::string& value) { this->mHeaders[key] = value; };
+    bool removeHeader(const std::string& key) { return this->mHeaders.erase(key) != 0; };
 
     void setHeaders(const HeadersMap_t& headers);
-    const HeadersMap_t& getHeaders() const { return this->m_Headers; };
+    const HeadersMap_t& getHeaders() const { return this->mHeaders; };
 
 private:
     std::ostringstream toHttpString();

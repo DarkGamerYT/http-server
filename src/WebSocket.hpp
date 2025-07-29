@@ -8,10 +8,10 @@
 
 class WebSocket {
 protected:
-    Socket_t m_ClientSocket;
+    Socket_t mClientSocket;
 
 public:
-    explicit WebSocket(Socket_t clientSocket) : m_ClientSocket(clientSocket) {};
+    explicit WebSocket(Socket_t clientSocket) : mClientSocket(clientSocket) {};
 
     void send(const std::string& data = "") const;
     void closeSocket() const;

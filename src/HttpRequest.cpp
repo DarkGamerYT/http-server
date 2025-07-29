@@ -2,7 +2,7 @@
 #include <iostream>
 HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
 {
-    this->m_ClientSocket = clientSocket;
+    this->mClientSocket = clientSocket;
 
     size_t lpos = 0, rpos = 0;
     rpos = data.find("\r\n", lpos);
@@ -37,15 +37,15 @@ HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
         throw std::invalid_argument("Invalid start line format");
     };
 
-    this->m_Path = path;
-    this->m_Method = HttpMethod::fromString(method);
+    this->mPath = path;
+    this->mMethod = HttpMethod::fromString(method);
 
     const auto& httpVersion = HttpVersion::fromString(version);
     if (httpVersion != HttpVersion::HTTP_1_1) {
         throw std::logic_error("HTTP version not supported");
     };
 
-    this->m_Version = httpVersion;
+    this->mVersion = httpVersion;
 
     // Parsing headers
     iss.clear();
@@ -63,10 +63,10 @@ HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
         std::erase_if(key, [](char c) { return std::isspace(c); });
         std::erase_if(value, [](char c) { return std::isspace(c); });
 
-        this->m_Headers[key] = value;
+        this->mHeaders[key] = value;
     };
 
-    this->m_Body = body;
+    this->mBody = body;
 };
 
 std::string HttpRequest::getRemoteAddr() const
@@ -74,7 +74,7 @@ std::string HttpRequest::getRemoteAddr() const
     sockaddr_in addr{};
     socklen_t addrLen = sizeof(addr);
 
-    if (getpeername(this->m_ClientSocket, reinterpret_cast<sockaddr*>(&addr), &addrLen) == -1)
+    if (getpeername(this->mClientSocket, reinterpret_cast<sockaddr*>(&addr), &addrLen) == -1)
         return "127.0.0.1";
 
 #if defined(_WIN32)
