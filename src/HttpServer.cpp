@@ -1,8 +1,10 @@
 #include "HttpServer.hpp"
 
 unsigned int HttpServer::s_MaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());
-HttpServer::HttpServer()
+HttpServer::HttpServer(bool enableWebSockets)
 {
+    this->m_bEnableWebSockets = enableWebSockets;
+
 #if defined(_WIN32)
     WSADATA m_wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0) {
@@ -175,6 +177,23 @@ void HttpServer::proccessRequests(int workerId)
         const std::string& path = request.getPath();
         const auto& method = request.getMethod();
 
+        if (HttpServer::isUpgradeRequest(request))
+        {
+            if (this->m_bEnableWebSockets)
+            {
+                HttpServer::upgradeConnection(clientSocket, request, buffer);
+            }
+            else
+            {
+            #if defined(_WIN32)
+                ::closesocket(clientSocket);
+            #elif defined(__unix__) || defined(__APPLE__)
+                ::close(clientSocket);
+            #endif
+            };
+            return;
+        };
+
         RouteHandlers_t handlers{};
         bool bExists = false;
         for (const auto& [route, data] : m_Routes)
@@ -212,6 +231,11 @@ void HttpServer::use(const std::string& route, HttpMethod::Method method,
         std::make_pair(method, callback)
     );
 };
+
+void HttpServer::websocket(const std::string &route, const WebSocketHandler& handler) {
+    this->m_Sockets[route] = handler;
+};
+
 
 inline std::string extractPrefix(const std::string& regexPath)
 {
@@ -281,5 +305,111 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
         };
 
         response.sendFile(canonicalPath);
+    };
+};
+
+void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<char>& buffer) {
+    const auto& path = request.getPath();
+    if (request.getMethod() != HttpMethod::GET
+        || !this->m_Sockets.contains(path))
+    {
+#if defined(_WIN32)
+        ::closesocket(socket);
+#elif defined(__unix__) || defined(__APPLE__)
+        ::close(socket);
+#endif
+        return;
+    };
+
+    auto key = request.getHeaders().at("Sec-WebSocket-Key");
+    HttpServer::upgradeWebSocket(socket, request, key);
+
+    WebSocket webSocket{ socket };
+    const auto&[onOpen, onMessage, onClose] = this->m_Sockets.at(path);
+    onOpen(webSocket);
+
+    while (true)
+    {
+#if defined(_WIN32)
+        int received = recv(socket, buffer.data(), static_cast<int>(buffer.size()), 0);
+#elif defined(__unix__) || defined(__APPLE__)
+        ssize_t received = read(socket, buffer.data(), buffer.size());
+#endif
+
+        if (received <= 0)
+            break;
+
+        if ((buffer[0] & 0x0F) == 0x8) {
+            onClose(webSocket);
+            HttpServer::sendToSocket(socket, std::string("\x88\x00", 2));
+            break;
+        };
+
+        std::array<uint8_t, 4> maskingKey{};
+        std::copy(buffer.data() + 2, buffer.data() + 6, maskingKey.begin());
+
+        // Decode payload
+        std::string message;
+        const uint8_t payloadSize = buffer[1] & 0x7F;
+        for (size_t i = 0; i < payloadSize; ++i)
+            message += static_cast<char>(buffer[6 + i] ^ maskingKey[i % 4]);
+
+        onMessage(webSocket, message);
+    };
+};
+
+void HttpServer::upgradeWebSocket(Socket_t socket, const HttpRequest& request, std::string& key) {
+    HttpResponse response{ socket, request, false };
+
+    response.setStatus(HttpStatus::SwitchingProtocols);
+    response.setHeader("Connection", "Upgrade");
+    response.setHeader("Upgrade", "websocket");
+
+    {
+        const auto& input = key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+
+        unsigned char hash[SHA_DIGEST_LENGTH];
+        SHA1(reinterpret_cast<const unsigned char *>(input.c_str()), input.size(), hash);
+
+        std::string binary(reinterpret_cast<char*>(hash), SHA_DIGEST_LENGTH);
+        const auto& output = Base64::encode(binary);
+
+        response.setHeader("Sec-WebSocket-Accept", output);
+    };
+
+    response.send();
+};
+
+bool HttpServer::isUpgradeRequest(const HttpRequest& request) {
+    const auto& headers = request.getHeaders();
+    if (!headers.contains("Connection")
+        || headers.at("Connection") != "Upgrade")
+        return false;
+
+    if (!headers.contains("Upgrade")
+        || headers.at("Upgrade") != "websocket")
+        return false;
+
+    if (!headers.contains("Sec-WebSocket-Key"))
+        return false;
+
+    return true;
+};
+
+void HttpServer::sendToSocket(Socket_t socket, const std::string& data) {
+    const char* buffer = data.c_str();
+    size_t bytesToSend = data.size();
+    size_t totalBytesSent = 0;
+    while (totalBytesSent < data.size())
+    {
+#if defined(_WIN32)
+        int bytesSent = ::send(socket, buffer + totalBytesSent, static_cast<int>(bytesToSend - totalBytesSent), 0);
+#elif defined(__unix__) || defined(__APPLE__)
+        ssize_t bytesSent = ::write(socket, buffer + totalBytesSent, bytesToSend - totalBytesSent);
+#endif
+        if (bytesSent < 0)
+            break;
+
+        totalBytesSent += bytesSent;
     };
 };

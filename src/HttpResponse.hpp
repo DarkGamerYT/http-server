@@ -17,15 +17,17 @@ private:
 protected:
     Socket_t m_ClientSocket;
     HttpRequest m_Request;
+    bool m_ShouldClose = true;
 
 public:
-    HttpResponse(Socket_t clientSocket, const HttpRequest& req) :
+    HttpResponse(Socket_t clientSocket, const HttpRequest& req, bool shouldClose = true) :
         m_ClientSocket(clientSocket),
-        m_Request(req) {};
+        m_Request(req),
+        m_ShouldClose(shouldClose) {};
 
     HttpResponse& setStatus(HttpStatus::Code status) { this->m_StatusCode = status; return *this; };
 
-    bool send(std::string data);
+    bool send(std::string data = "");
     bool sendStatus(HttpStatus::Code status);
     bool sendFile(const std::filesystem::path& path);
     bool redirect(const std::string& location);

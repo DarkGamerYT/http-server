@@ -1,5 +1,5 @@
 #include "HttpResponse.hpp"
-#include <iostream>
+#include "HttpServer.hpp"
 
 bool HttpResponse::send(std::string data)
 {
@@ -96,22 +96,11 @@ bool HttpResponse::sendToSocket(const std::string& data)
     if (true == this->m_HeadersSent)
         return false;
 
-#if defined(_WIN32)
-    long totalBytesSent = 0;
-    while (totalBytesSent < data.size())
-    {
-        int bytesSent = ::send(this->m_ClientSocket, data.c_str(), static_cast<int>(data.size()), 0);
-        if (bytesSent < 0)
-            break;
-
-        totalBytesSent += bytesSent;
-    };
-#elif defined(__unix__) || defined(__APPLE__)
-    long bytesSent = ::write(this->m_ClientSocket, data.c_str(), data.size());
-#endif
+    HttpServer::sendToSocket(this->m_ClientSocket, data);
 
     this->m_HeadersSent = true;
-    this->closeSocket();
+    if (this->m_ShouldClose)
+        this->closeSocket();
     return true;
 };
 

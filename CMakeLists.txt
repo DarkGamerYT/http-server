@@ -15,6 +15,10 @@ project(${NAME} LANGUAGES CXX VERSION 1.0.0)
 
 file(GLOB_RECURSE SRC "./src/*.cpp")
 add_library(${NAME} STATIC ${SRC})
+
+find_package(OpenSSL REQUIRED)
+target_link_libraries(${NAME} OpenSSL::SSL OpenSSL::Crypto)
+
 target_include_directories(
     ${NAME}
     INTERFACE
