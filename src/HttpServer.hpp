@@ -46,6 +46,11 @@ using NextFn = std::function<void()>;
 using Middleware_t = std::function<void(const HttpRequest&, HttpResponse&, NextFn)>;
 using RouteHandlers_t = std::unordered_map<HttpMethod::Method, std::vector<Middleware_t>>;
 
+template<typename T>
+concept IsMiddleware =
+    std::is_convertible_v<T, Middleware_t> ||
+    std::is_invocable_r_v<void, T, const HttpRequest&, HttpResponse&>;
+
 class HttpServer
 {
 private:
@@ -73,10 +78,33 @@ public:
 	~HttpServer();
 
     template<typename... Middlewares>
-    requires (std::conjunction_v<std::is_convertible<Middlewares, Middleware_t>...>)
+    requires (IsMiddleware<Middlewares> && ...)
+    void use(const std::string& route, Middlewares... mws) {
+        for (int i = HttpMethod::GET; i <= static_cast<int>(HttpMethod::PATCH); ++i)
+        {
+            const auto& method = static_cast<HttpMethod::Method>(i);
+            this->use(route, method, std::move(mws...));
+        };
+    };
+
+    template<typename... Middlewares>
+    requires (IsMiddleware<Middlewares> && ...)
     void use(const std::string& route, HttpMethod::Method method, Middlewares... mws) {
+        std::vector<Middleware_t> middlewares;
+        (middlewares.push_back(
+            []<typename T>(T middleware) {
+                if constexpr (std::is_convertible_v<T, Middleware_t>)
+                    return middleware;
+
+                else return [middleware](const HttpRequest& req, HttpResponse& res, const NextFn& next) {
+                    middleware(req, res);
+                    next();
+                };
+            }(mws)
+        ), ...);
+
         this->mRoutes[route].insert(
-            std::make_pair(method, std::vector<Middleware_t>{ mws... })
+            std::make_pair(method, std::move(middlewares))
         );
     };
 

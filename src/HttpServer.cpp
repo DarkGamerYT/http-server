@@ -200,7 +200,7 @@ void HttpServer::processRequests(int workerId)
         {
             bool matches = false;
             try {
-                const std::regex& pattern{ route };
+                const std::regex pattern{ route };
                 matches = std::regex_match(path, pattern);
             }
             catch (...) {
@@ -226,7 +226,7 @@ void HttpServer::processRequests(int workerId)
         {
             size_t i = 0;
             std::function<void()> next = [&]() {
-                if (i > chain.size())
+                if (i >= chain.size())
                     return;
 
                 auto& mw = chain[i++];
@@ -318,7 +318,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     {
         bool matches = false;
         try {
-            const std::regex& pattern{ route };
+            const std::regex pattern{ route };
             matches = std::regex_match(path, pattern);
         }
         catch (...) {
