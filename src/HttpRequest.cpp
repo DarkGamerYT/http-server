@@ -1,5 +1,4 @@
 #include "HttpRequest.hpp"
-#include <iostream>
 HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
 {
     this->mClientSocket = clientSocket;

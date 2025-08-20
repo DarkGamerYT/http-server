@@ -2,26 +2,12 @@
 #define HTTPREQUEST_HPP
 
 #include <unordered_map>
-#include <stdexcept>
 #include <sstream>
-
-#if defined(_WIN32)
-    #include <WinSock2.h>
-    #include <ws2tcpip.h>
-#elif defined(__unix__) || defined(__APPLE__)
-    #include <unistd.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-#endif
-
-#if defined(_WIN32)
-    typedef SOCKET Socket_t;
-#elif defined(__unix__) || defined(__APPLE__)
-    typedef int Socket_t;
-#endif
 
 #include "util/HttpMethod.hpp"
 #include "util/HttpVersion.hpp"
+
+#include "Common.hpp"
 
 typedef std::unordered_map<std::string, std::string> HeadersMap_t;
 class HttpRequest

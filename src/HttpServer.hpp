@@ -1,27 +1,6 @@
 #ifndef HTTPSERVER_HPP
 #define HTTPSERVER_HPP
 
-#include <openssl/sha.h>
-
-#ifndef NOMINMAX
-    #define NOMINMAX
-#endif /* NOMINMAX */
-
-#if defined(_WIN32)
-    #include <WinSock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "Ws2_32.lib")
-#elif defined(__unix__) || defined(__APPLE__)
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <netinet/tcp.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-#endif
-
-#include <stdexcept>
-#include <cerrno>
-#include <iostream>
 #include <thread>
 #include <vector>
 #include <functional>
@@ -30,13 +9,13 @@
 #include <condition_variable>
 #include <regex>
 #include <variant>
-#include <array>
 #include <ranges>
-#include <filesystem>
 #include <map>
 
 #include "util/HttpMethod.hpp"
-#include "util/Base64.hpp"
+#include "util/HttpVersion.hpp"
+
+#include "Common.hpp"
 
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"

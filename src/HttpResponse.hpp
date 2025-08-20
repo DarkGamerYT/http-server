@@ -1,8 +1,6 @@
 #ifndef HTTPRESPONSE_HPP
 #define HTTPRESPONSE_HPP
 
-#include <fstream>
-
 #include "HttpRequest.hpp"
 #include "util/HttpStatus.hpp"
 #include "util/MimeType.hpp"

@@ -1,6 +1,8 @@
-#include "HttpServer.hpp"
+#include <print>
 
+#include "HttpServer.hpp"
 HttpServer g_Server{ true, HttpVersion::HTTP_1_1 };
+
 int main(int argc, char* argv[])
 {
     g_Server.use("/", HttpMethod::GET,
@@ -12,14 +14,14 @@ int main(int argc, char* argv[])
 
     g_Server.websocket("/ws", {
         .onOpen = [](const WebSocket& ws) {
-            std::cout << "New WebSocket connection\n";
+            std::println("New WebSocket connection");
             ws.send("Hello, world!");
         },
         .onMessage = [](const WebSocket& ws, const std::string& msg) {
-            std::cout << "Received: " << msg << std::endl;
+            std::println("Received message: '{}'", msg);
         },
         .onClose = [](const WebSocket& ws) {
-            std::cout << "WebSocket closed\n";
+            std::println("WebSocket closed");
         },
     });
 

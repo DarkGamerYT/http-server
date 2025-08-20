@@ -1,3 +1,6 @@
+#include <openssl/sha.h>
+#include "util/Base64.hpp"
+
 #include "HttpServer.hpp"
 
 unsigned int HttpServer::sMaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());

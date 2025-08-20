@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "HttpResponse.hpp"
 #include "HttpServer.hpp"
 
