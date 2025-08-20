@@ -1,9 +1,13 @@
 #include "HttpServer.hpp"
 
 unsigned int HttpServer::sMaxWorkerThreads = std::max(1u, std::thread::hardware_concurrency());
-HttpServer::HttpServer(bool enableWebSockets)
+HttpServer::HttpServer(const bool enableWebSockets, const HttpVersion::Version version)
 {
     this->b_mEnableWebSockets = enableWebSockets;
+    this->mVersion = version;
+
+    if (this->mVersion != HttpVersion::HTTP_1_1)
+        throw std::runtime_error("Unsupported HTTP version");
 
 #if defined(_WIN32)
     WSADATA wsaData;
@@ -76,7 +80,7 @@ void HttpServer::close()
 
 void HttpServer::listen()
 {
-    int opt = 1;
+    constexpr int opt = 1;
     // SO_REUSEADDR
 #if defined(_WIN32)
     if (setsockopt(this->mServerSocket, SOL_SOCKET, SO_REUSEADDR,
@@ -115,7 +119,7 @@ void HttpServer::listen()
     
     mWorkerThreads.resize(sMaxWorkerThreads);
     for (auto i = 0; i < sMaxWorkerThreads; i++) {
-        mWorkerThreads[i] = std::thread(&HttpServer::proccessRequests, this, i);
+        mWorkerThreads[i] = std::thread(&HttpServer::processRequests, this, i);
     };
 
     this->receiveConnections();
@@ -140,11 +144,11 @@ void HttpServer::receiveConnections()
     };
 };
 
-void HttpServer::proccessRequests(int workerId)
+void HttpServer::processRequests(int workerId)
 {
     while (this->b_mIsRunning)
     {
-        sockaddr_in clientAddress{};
+        //sockaddr_in clientAddress{};
         Socket_t clientSocket;
         {
             std::unique_lock lock(mQueueMutex);
@@ -157,7 +161,7 @@ void HttpServer::proccessRequests(int workerId)
 
             const auto& [ socket, address ] = mRequestQueue.front();
             clientSocket = socket;
-            clientAddress = address;
+            //clientAddress = address;
             mRequestQueue.pop();
         };
 
@@ -175,12 +179,12 @@ void HttpServer::proccessRequests(int workerId)
         HttpRequest request{ clientSocket, data };
 
         const std::string& path = request.getPath();
-        const auto& method = request.getMethod();
+        const HttpMethod::Method& method = request.getMethod();
 
         if (HttpServer::isUpgradeRequest(request))
         {
             if (this->b_mEnableWebSockets)
-                HttpServer::upgradeConnection(clientSocket, request, buffer);
+                this->upgradeConnection(clientSocket, request, buffer);
 
         #if defined(_WIN32)
             ::closesocket(clientSocket);
@@ -196,7 +200,7 @@ void HttpServer::proccessRequests(int workerId)
         {
             bool matches = false;
             try {
-                std::regex pattern{ route };
+                const std::regex& pattern{ route };
                 matches = std::regex_match(path, pattern);
             }
             catch (...) {
@@ -215,21 +219,23 @@ void HttpServer::proccessRequests(int workerId)
         if (false == bExists || !handlers.contains(method))
             continue;
 
-        const RequestHandler_t& handler = handlers.at(method);
-        handler(request, { clientSocket, request });
+        HttpResponse response{ clientSocket, request, this->mVersion };
+        response.setHeader("Content-Type", "text/plain");
+
+        const std::vector<Middleware_t>& chain = handlers.at(method);
+        {
+            size_t i = 0;
+            std::function<void()> next = [&]() {
+                if (i > chain.size())
+                    return;
+
+                auto& mw = chain[i++];
+                mw(request, response, next);
+            };
+
+            next();
+        };
     };
-};
-
-void HttpServer::use(const std::string& route, HttpMethod::Method method,
-    const RequestHandler_t& callback)
-{
-    this->mRoutes[route].insert(
-        std::make_pair(method, callback)
-    );
-};
-
-void HttpServer::websocket(const std::string &route, const WebSocketHandler& handler) {
-    this->mSockets[route] = handler;
 };
 
 
@@ -254,13 +260,13 @@ inline std::string extractPrefix(const std::string& regexPath)
     return regexPath.substr(0, i);
 };
 
-RequestHandler_t HttpServer::useStatic(const std::string& directory)
+Middleware_t HttpServer::useStatic(const std::string& directory)
 {
-    return [directory](const HttpRequest& request, HttpResponse response) {
+    return [directory](const HttpRequest& request, HttpResponse& response, const NextFn&) {
         const std::string& fullPath = request.getPath();
         const std::string& originalPattern = request.getOriginalPath();
 
-        std::string routePrefix = extractPrefix(originalPattern);
+        const std::string& routePrefix = extractPrefix(originalPattern);
         if (fullPath.find(routePrefix) != 0) {
             response.setStatus(HttpStatus::NotFound);
             response.setHeader("Content-Type", "text/plain");
@@ -272,11 +278,11 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
         if (!relative.empty() && relative.front() == '/')
             relative.erase(0, 1);
 
-        std::filesystem::path requestedPath = std::filesystem::path(directory) / relative;
-        std::error_code error;
+        const std::filesystem::path& requestedPath = std::filesystem::path(directory) / relative;
 
-        auto canonicalPath = std::filesystem::weakly_canonical(requestedPath, error);
-        auto canonicalRoot = std::filesystem::weakly_canonical(directory, error);
+        std::error_code error;
+        const auto canonicalPath = std::filesystem::weakly_canonical(requestedPath, error);
+        const auto canonicalRoot = std::filesystem::weakly_canonical(directory, error);
 
         if (
             error
@@ -304,7 +310,7 @@ RequestHandler_t HttpServer::useStatic(const std::string& directory)
 };
 
 void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer) {
-    const auto& path = request.getPath();
+    const std::string& path = request.getPath();
 
     WebSocketHandler handlers;
     bool bExists = false;
@@ -312,7 +318,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     {
         bool matches = false;
         try {
-            std::regex pattern{ route };
+            const std::regex& pattern{ route };
             matches = std::regex_match(path, pattern);
         }
         catch (...) {
@@ -327,8 +333,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
         };
     };
 
-    if (request.getMethod() != HttpMethod::GET
-        || false == bExists)
+    if (request.getMethod() != HttpMethod::GET || false == bExists)
     {
 #if defined(_WIN32)
         ::closesocket(socket);
@@ -342,7 +347,10 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     HttpServer::upgradeWebSocket(socket, request, key);
 
     WebSocket webSocket{ socket };
-    const auto& [onOpen, onMessage, onClose] = handlers;
+    const auto& [
+        onOpen,
+        onMessage,
+        onClose ] = handlers;
     onOpen(webSocket);
 
     std::string fragmentBuffer;
@@ -350,9 +358,9 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     while (true)
     {
 #if defined(_WIN32)
-        int received = recv(socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
+        const int received = recv(socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
 #elif defined(__unix__) || defined(__APPLE__)
-        ssize_t received = read(socket, buffer.data(), buffer.size());
+        const ssize_t received = read(socket, buffer.data(), buffer.size());
 #endif
 
         if (received <= 0)
@@ -365,8 +373,8 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
             break;
         };
 
-        bool isFinal = buffer[0] & 0x80;
-        uint8_t lengthCode = buffer[1] & 0x7F;
+        const bool isFinal = buffer[0] & 0x80;
+        const uint8_t lengthCode = buffer[1] & 0x7F;
 
         size_t payloadSize = lengthCode;
         size_t offset = 2;
@@ -441,8 +449,8 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     };
 };
 
-void HttpServer::upgradeWebSocket(Socket_t socket, const HttpRequest& request, std::string& key) {
-    HttpResponse response{ socket, request, false };
+void HttpServer::upgradeWebSocket(const Socket_t socket, const HttpRequest& request, std::string& key) const {
+    HttpResponse response{ socket, request, this->mVersion, false };
 
     response.setStatus(HttpStatus::SwitchingProtocols);
     response.setHeader("Connection", "Upgrade");
@@ -454,7 +462,7 @@ void HttpServer::upgradeWebSocket(Socket_t socket, const HttpRequest& request, s
         unsigned char hash[SHA_DIGEST_LENGTH];
         SHA1(reinterpret_cast<const unsigned char *>(input.c_str()), input.size(), hash);
 
-        std::string binary(reinterpret_cast<char*>(hash), SHA_DIGEST_LENGTH);
+        const std::string binary(reinterpret_cast<char*>(hash), SHA_DIGEST_LENGTH);
         const auto& output = Base64::encode(binary);
 
         response.setHeader("Sec-WebSocket-Accept", output);
@@ -479,16 +487,17 @@ bool HttpServer::isUpgradeRequest(const HttpRequest& request) {
     return true;
 };
 
-void HttpServer::sendToSocket(Socket_t socket, const std::string& data) {
+void HttpServer::sendToSocket(const Socket_t socket, const std::string& data) {
     const char* buffer = data.c_str();
-    size_t bytesToSend = data.size();
+    const size_t bytesToSend = data.size();
+
     size_t totalBytesSent = 0;
     while (totalBytesSent < data.size())
     {
 #if defined(_WIN32)
-        int bytesSent = ::send(socket, buffer + totalBytesSent, static_cast<int>(bytesToSend - totalBytesSent), 0);
+        const int bytesSent = ::send(socket, buffer + totalBytesSent, static_cast<int>(bytesToSend - totalBytesSent), 0);
 #elif defined(__unix__) || defined(__APPLE__)
-        ssize_t bytesSent = ::write(socket, buffer + totalBytesSent, bytesToSend - totalBytesSent);
+        const ssize_t bytesSent = ::write(socket, buffer + totalBytesSent, bytesToSend - totalBytesSent);
 #endif
         if (bytesSent < 0)
             break;

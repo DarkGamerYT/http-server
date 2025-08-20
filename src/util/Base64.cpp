@@ -3,7 +3,7 @@ namespace Base64
 {
     // Encoding
     std::string encode(const std::string& input) {
-        std::vector<uint8_t> bytes(input.begin(), input.end());
+        const std::vector<uint8_t> bytes(input.begin(), input.end());
         return Base64::encode(bytes);
     };
 
@@ -53,7 +53,7 @@ namespace Base64
 
     // Decoding
     std::vector<uint8_t> decode(const std::string& input) {
-        std::vector<uint8_t> bytes(input.begin(), input.end());
+        const std::vector<uint8_t> bytes(input.begin(), input.end());
         return Base64::decode(bytes);
     };
 
@@ -62,7 +62,7 @@ namespace Base64
         int i = 0;
         uint8_t a[4], b[3];
 
-        for (uint8_t byte : input) {
+        for (const uint8_t byte : input) {
             if (REVERSE_TABLE[byte] == 0xFF) // Invalid char
                 continue;
 

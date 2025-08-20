@@ -10,15 +10,15 @@ class MimeType
 public:
     static std::string getMimeType(const std::filesystem::path& path)
     {
-        auto extension = path.extension().string();
-        if (!s_MimeTypeMap.contains(extension))
+        const std::string& extension = path.extension().string();
+        if (!sMimeTypeMap.contains(extension))
             return "application/octet-stream";
 
-        return s_MimeTypeMap[extension];
+        return sMimeTypeMap[extension];
     };
 
 private:
-    inline static std::unordered_map<std::string, std::string> s_MimeTypeMap = {
+    inline static std::unordered_map<std::string, std::string> sMimeTypeMap = {
         { ".aac", "audio/aac" },
         { ".abw", "application/x-abiword" },
         { ".apng", "image/apng" },

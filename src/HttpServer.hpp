@@ -42,8 +42,9 @@
 #include "HttpResponse.hpp"
 #include "WebSocket.hpp"
 
-typedef std::function<void(HttpRequest, HttpResponse)> RequestHandler_t;
-typedef std::unordered_map<HttpMethod::Method, RequestHandler_t> RouteHandlers_t;
+using NextFn = std::function<void()>;
+using Middleware_t = std::function<void(const HttpRequest&, HttpResponse&, NextFn)>;
+using RouteHandlers_t = std::unordered_map<HttpMethod::Method, std::vector<Middleware_t>>;
 
 class HttpServer
 {
@@ -62,34 +63,42 @@ private:
 protected:
     Socket_t mServerSocket{ 0 };
     sockaddr_in mSocketAddress{};
+    HttpVersion::Version mVersion;
 
     std::map<std::string, RouteHandlers_t> mRoutes;
     std::map<std::string, WebSocketHandler> mSockets;
 
 public:
-	explicit HttpServer(bool enableWebSockets = false);
+	explicit HttpServer(bool enableWebSockets = false, HttpVersion::Version version = HttpVersion::HTTP_1_1);
 	~HttpServer();
 
-    void use(const std::string& route, HttpMethod::Method method,
-        const RequestHandler_t& callback);
+    template<typename... Middlewares>
+    requires (std::conjunction_v<std::is_convertible<Middlewares, Middleware_t>...>)
+    void use(const std::string& route, HttpMethod::Method method, Middlewares... mws) {
+        this->mRoutes[route].insert(
+            std::make_pair(method, std::vector<Middleware_t>{ mws... })
+        );
+    };
 
-    void websocket(const std::string& route, const WebSocketHandler& handler);
+    void websocket(const std::string& route, const WebSocketHandler& handler) {
+        this->mSockets[route] = handler;
+    };
 
     void listen(unsigned short port);
     void listen(const char* address, unsigned short port);
     void close();
 
-    static RequestHandler_t useStatic(const std::string& directory);
+    static Middleware_t useStatic(const std::string& directory);
     static void sendToSocket(Socket_t socket, const std::string& data);
 
 private:
     void listen();
     void receiveConnections();
-    void proccessRequests(int workerId);
+    void processRequests(int workerId);
 
-    static bool isUpgradeRequest(const HttpRequest& request);
     void upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer);
-    static void upgradeWebSocket(Socket_t socket, const HttpRequest& request, std::string& key);
+    void upgradeWebSocket(Socket_t socket, const HttpRequest& request, std::string& key) const;
+    static bool isUpgradeRequest(const HttpRequest& request);
 };
 
 #endif // !HTTPSERVER_HPP

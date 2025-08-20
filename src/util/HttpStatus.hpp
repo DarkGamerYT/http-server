@@ -147,7 +147,7 @@ namespace HttpStatus
         NetworkAuthenticationRequired = 511,
     };
 
-    inline std::string toString(Code status)
+    inline std::string toString(const Code status)
     {
         switch (status)
         {

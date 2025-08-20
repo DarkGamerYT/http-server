@@ -60,8 +60,8 @@ HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
         std::getline(header, key, ':');
         std::getline(header, value);
 
-        std::erase_if(key, [](char c) { return std::isspace(c); });
-        std::erase_if(value, [](char c) { return std::isspace(c); });
+        std::erase_if(key, [](const char& c) { return std::isspace(c); });
+        std::erase_if(value, [](const char& c) { return std::isspace(c); });
 
         this->mHeaders[key] = value;
     };
@@ -83,6 +83,6 @@ std::string HttpRequest::getRemoteAddr() const
 
     return address;
 #else
-    return std::string(inet_ntoa(addr.sin_addr));
+    return { inet_ntoa(addr.sin_addr) };
 #endif
 };

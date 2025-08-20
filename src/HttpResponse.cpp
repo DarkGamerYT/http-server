@@ -3,10 +3,7 @@
 
 bool HttpResponse::send(std::string data)
 {
-    if (!this->mHeaders.contains("Content-Type"))
-        this->setHeader("Content-Type", "text/html");
-
-    size_t length = data.length();
+    const size_t length = data.length();
     this->setHeader("Content-Length", std::to_string(length));
 
     if (
@@ -36,7 +33,7 @@ bool HttpResponse::send(std::string data)
     return this->sendToSocket(stream.str());
 };
 
-bool HttpResponse::sendStatus(HttpStatus::Code status)
+bool HttpResponse::sendStatus(const HttpStatus::Code status)
 {
     this->mStatusCode = status;
     return this->send("");
@@ -66,17 +63,17 @@ bool HttpResponse::redirect(const std::string& location)
 
     this->setHeader("Location", location);
 
-    std::ostringstream stream = this->toHttpString();
+    const std::ostringstream& stream = this->toHttpString();
     return this->sendToSocket(stream.str());
 }
 
 std::ostringstream HttpResponse::toHttpString()
 {
-    std::string statusMessage = HttpStatus::toString(this->mStatusCode);
+    const std::string& statusMessage = HttpStatus::toString(this->mStatusCode);
 
     std::ostringstream stream;
     stream
-        << "HTTP/1.1 " << std::to_string(this->mStatusCode)
+        << HttpVersion::toString(this->mVersion) << " " << std::to_string(this->mStatusCode)
         << " " << statusMessage << "\r\n";
 
     for (const auto& [key, value] : this->mHeaders)

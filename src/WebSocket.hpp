@@ -11,7 +11,8 @@ protected:
     Socket_t mClientSocket;
 
 public:
-    explicit WebSocket(Socket_t clientSocket) : mClientSocket(clientSocket) {};
+    explicit WebSocket(const Socket_t clientSocket)
+        : mClientSocket(clientSocket) {};
 
     void send(const std::string& data = "") const;
     void closeSocket() const;

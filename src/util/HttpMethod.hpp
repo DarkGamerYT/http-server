@@ -30,7 +30,7 @@ namespace HttpMethod
         PATCH
     };
 
-    inline std::string toString(Method method)
+    inline std::string toString(const Method method)
     {
         switch (method)
         {
@@ -52,7 +52,7 @@ namespace HttpMethod
     {
         std::string methodString;
         std::ranges::transform(method, std::back_inserter(methodString),
-            [](char c) { return toupper(c); });
+            [](const char& c) { return toupper(c); });
 
         if (methodString == "GET") {
             return HttpMethod::GET;

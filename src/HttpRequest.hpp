@@ -42,14 +42,14 @@ public:
     HttpRequest(Socket_t clientSocket, const std::string& data);
     ~HttpRequest() = default;
 
-    const std::string& getPath() const { return this->mPath; };
-    const std::string& getOriginalPath() const { return this->mOriginalPath; };
-    const std::string& getBody() const { return this->mBody; };
-    const HeadersMap_t& getHeaders() const { return this->mHeaders; };
+    [[nodiscard]] const std::string& getPath() const { return this->mPath; };
+    [[nodiscard]] const std::string& getOriginalPath() const { return this->mOriginalPath; };
+    [[nodiscard]] const std::string& getBody() const { return this->mBody; };
+    [[nodiscard]] const HeadersMap_t& getHeaders() const { return this->mHeaders; };
 
-    std::string getRemoteAddr() const;
-    HttpMethod::Method getMethod() const { return this->mMethod; };
-    HttpVersion::Version getVersion() const { return this->mVersion; };
+    [[nodiscard]] std::string getRemoteAddr() const;
+    [[nodiscard]] HttpMethod::Method getMethod() const { return this->mMethod; };
+    [[nodiscard]] HttpVersion::Version getVersion() const { return this->mVersion; };
 
 private:
     void setOriginalPath(const std::string& path) { this->mOriginalPath = path; };
