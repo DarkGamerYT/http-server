@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(NAME http-server)
 
+project(http-server LANGUAGES CXX VERSION 1.0.0)
 option(HTTP_BUILD_EXAMPLES "Build examples" ON)
 
 # Enable Hot Reload for MSVC compilers if supported.
@@ -15,16 +15,14 @@ if (MSVC)
     add_definitions(-DNOMINMAX)
 endif()
 
-project(${NAME} LANGUAGES CXX VERSION 1.0.0)
-
 file(GLOB_RECURSE SRC "./src/*.cpp")
-add_library(${NAME} STATIC ${SRC})
+add_library(${PROJECT_NAME} STATIC ${SRC})
 
 find_package(OpenSSL REQUIRED)
-target_link_libraries(${NAME} OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 target_include_directories(
-    ${NAME}
+    ${PROJECT_NAME}
     INTERFACE
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
