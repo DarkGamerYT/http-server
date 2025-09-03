@@ -147,6 +147,26 @@ void HttpServer::receiveConnections()
     };
 };
 
+template <typename Map, typename Handler>
+ std::optional<std::pair<std::string, Handler>> findRoute(const std::string& path, Map routes) {
+    for (const auto& route : routes | std::views::keys)
+    {
+        bool matches = false;
+        try {
+            const std::regex pattern{ route };
+            matches = std::regex_match(path, pattern);
+        }
+        catch (...) {
+            matches = (route == path);
+        };
+
+        if (true == matches)
+            return std::make_pair(path, routes.at(route));
+    };
+
+    return std::nullopt;
+};
+
 void HttpServer::processRequests(int workerId)
 {
     while (this->b_mIsRunning)
@@ -170,9 +190,9 @@ void HttpServer::processRequests(int workerId)
 
         std::vector<uint8_t> buffer(sMaxBufferSize);
     #if defined(_WIN32)
-        int bytesReceived = recv(clientSocket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
+        const int bytesReceived = recv(clientSocket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
     #elif defined(__unix__) || defined(__APPLE__)
-        ssize_t bytesReceived = read(clientSocket, buffer.data(), buffer.size());
+        const ssize_t bytesReceived = read(clientSocket, buffer.data(), buffer.size());
     #endif
 
         if (bytesReceived < 1)
@@ -197,35 +217,20 @@ void HttpServer::processRequests(int workerId)
             return;
         };
 
-        RouteHandlers_t handlers{};
-        bool bExists = false;
-        for (const auto& route : this->mRoutes | std::views::keys)
-        {
-            bool matches = false;
-            try {
-                const std::regex pattern{ route };
-                matches = std::regex_match(path, pattern);
-            }
-            catch (...) {
-                matches = (route == path);
-            };
+        const auto& route =
+            findRoute<decltype(this->mRoutes), RouteHandlers>(path, this->mRoutes);
 
-            if (true == matches)
-            {
-                bExists = true;
-                handlers = this->mRoutes.at(route);
-                request.setOriginalPath(route);
-                break;
-            };
-        };
+        if (!route.has_value())
+            continue;
 
-        if (false == bExists || !handlers.contains(method))
+        const auto& handlers = route.value().second;
+        if (!handlers.contains(method))
             continue;
 
         HttpResponse response{ clientSocket, request, this->mVersion };
         response.setHeader("Content-Type", "text/plain");
 
-        const std::vector<Middleware_t>& chain = handlers.at(method);
+        const std::vector<Middleware>& chain = handlers.at(method);
         {
             size_t i = 0;
             std::function<void()> next = [&]() {
@@ -263,7 +268,7 @@ inline std::string extractPrefix(const std::string& regexPath)
     return regexPath.substr(0, i);
 };
 
-Middleware_t HttpServer::useStatic(const std::string& directory)
+Middleware HttpServer::useStatic(const std::string& directory)
 {
     return [directory](const HttpRequest& request, HttpResponse& response, const NextFn&) {
         const std::string& fullPath = request.getPath();
@@ -314,29 +319,14 @@ Middleware_t HttpServer::useStatic(const std::string& directory)
 
 void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer) {
     const std::string& path = request.getPath();
+    const auto& route =
+        findRoute<decltype(this->mSockets), WebSocketHandler>(path, this->mSockets);
 
-    WebSocketHandler handlers;
-    bool bExists = false;
-    for (const auto& route: this->mSockets | std::views::keys)
-    {
-        bool matches = false;
-        try {
-            const std::regex pattern{ route };
-            matches = std::regex_match(path, pattern);
-        }
-        catch (...) {
-            matches = (route == path);
-        };
+    if (!route.has_value())
+        return;
 
-        if (true == matches)
-        {
-            bExists = true;
-            handlers = this->mSockets.at(route);
-            break;
-        };
-    };
-
-    if (request.getMethod() != HttpMethod::GET || false == bExists)
+    const auto& key = request.getHeader("Sec-WebSocket-Key");
+    if (request.getMethod() != HttpMethod::GET || !key.has_value())
     {
 #if defined(_WIN32)
         ::closesocket(socket);
@@ -346,120 +336,137 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
         return;
     };
 
-    auto key = request.getHeaders().at("Sec-WebSocket-Key");
-    HttpServer::upgradeWebSocket(socket, request, key);
+    HttpResponse response{ socket, request, this->mVersion, false };
+    HttpServer::upgradeWebSocket(response, key.value());
 
-    WebSocket webSocket{ socket };
+    const auto& handlers = route.value().second;
     const auto& [
+        onRequest,
         onOpen,
         onMessage,
         onClose ] = handlers;
-    onOpen(webSocket);
 
-    std::string fragmentBuffer;
-    bool isFragmented = false;
-    while (true)
-    {
-#if defined(_WIN32)
-        const int received = recv(socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
-#elif defined(__unix__) || defined(__APPLE__)
-        const ssize_t received = read(socket, buffer.data(), buffer.size());
-#endif
+    std::function next = [&]() {
+        response.send();
 
-        if (received <= 0)
-            break;
+        WebSocket webSocket{ socket };
+        onOpen(webSocket);
 
-        const uint8_t opcode = buffer[0] & 0x0F;
-        if (opcode == 0x8) {
-            onClose(webSocket);
-            HttpServer::sendToSocket(socket, std::string{ static_cast<char>(0x88), 0x00 });
-            break;
-        };
-
-        const bool isFinal = buffer[0] & 0x80;
-        const uint8_t lengthCode = buffer[1] & 0x7F;
-
-        size_t payloadSize = lengthCode;
-        size_t offset = 2;
-        if (lengthCode == 126) {
-            if (received < 4)
-                continue;
-
-            payloadSize = (static_cast<size_t>(buffer[2]) << 8) | buffer[3];
-            offset += 2;
-        }
-        else if (lengthCode == 127) {
-            if (received < 10)
-                continue;
-
-            payloadSize = 0;
-            for (int i = 0; i < 8; ++i)
-                payloadSize = (payloadSize << 8) | static_cast<size_t>(buffer[2 + i]);
-
-            offset += 8;
-        };
-
-        if (buffer.size() < offset + 4 + payloadSize)
-            continue; // Wait for more data
-
-        std::array<uint8_t, 4> maskingKey{};
-        std::copy_n(buffer.data() + offset, 4, maskingKey.begin());
-        offset += 4;
-
-        // Decode payload
-        std::string message;
-        message.reserve(payloadSize);
-
-        for (size_t i = 0; i < payloadSize; ++i)
-            message += static_cast<char>(buffer[offset + i] ^ maskingKey[i % 4]);
-
-        switch (opcode)
+        std::string fragmentBuffer;
+        bool isFragmented = false;
+        while (true)
         {
-            case 0x1: {
-                // Text frame - possibly fragmented
-                if (!isFinal)
-                {
-                    fragmentBuffer = message;
-                    isFragmented = true;
+    #if defined(_WIN32)
+            const int received = recv(socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
+    #elif defined(__unix__) || defined(__APPLE__)
+            const ssize_t received = read(socket, buffer.data(), buffer.size());
+    #endif
+
+            if (received <= 0)
+                break;
+
+            const uint8_t opcode = buffer[0] & 0x0F;
+            if (opcode == 0x8) {
+                onClose(webSocket);
+                HttpServer::sendToSocket(socket, std::string{ static_cast<char>(0x88), 0x00 });
+                break;
+            };
+
+            const bool isFinal = buffer[0] & 0x80;
+            const uint8_t lengthCode = buffer[1] & 0x7F;
+
+            size_t payloadSize = lengthCode;
+            size_t offset = 2;
+            if (lengthCode == 126) {
+                if (received < 4)
                     continue;
-                };
 
-                onMessage(webSocket, message);
-                break;
+                payloadSize = (static_cast<size_t>(buffer[2]) << 8) | buffer[3];
+                offset += 2;
+            }
+            else if (lengthCode == 127) {
+                if (received < 10)
+                    continue;
+
+                payloadSize = 0;
+                for (int i = 0; i < 8; ++i)
+                    payloadSize = (payloadSize << 8) | static_cast<size_t>(buffer[2 + i]);
+
+                offset += 8;
             };
 
-            case 0x0: {
-                // Continuation frame
-                if (!isFragmented)
-                    continue; // Unexpected continuation
+            if (buffer.size() < offset + 4 + payloadSize)
+                continue; // Wait for more data
 
-                fragmentBuffer += message;
+            std::array<uint8_t, 4> maskingKey{};
+            std::copy_n(buffer.data() + offset, 4, maskingKey.begin());
+            offset += 4;
 
-                if (isFinal)
-                {
-                    onMessage(webSocket, fragmentBuffer);
-                    fragmentBuffer.clear();
-                    isFragmented = false;
+            // Decode payload
+            std::string message;
+            message.reserve(payloadSize);
+
+            for (size_t i = 0; i < payloadSize; ++i)
+                message += static_cast<char>(buffer[offset + i] ^ maskingKey[i % 4]);
+
+            switch (opcode)
+            {
+                case 0x1: {
+                    // Text frame - possibly fragmented
+                    if (!isFinal)
+                    {
+                        fragmentBuffer = message;
+                        isFragmented = true;
+                        continue;
+                    };
+
+                    onMessage(webSocket, message);
+                    break;
                 };
 
-                break;
-            };
+                case 0x0: {
+                    // Continuation frame
+                    if (!isFragmented)
+                        continue; // Unexpected continuation
 
-            default:
-                // Unsupported opcode (e.g., binary or ping)
-                break;
+                    fragmentBuffer += message;
+
+                    if (isFinal)
+                    {
+                        onMessage(webSocket, fragmentBuffer);
+                        fragmentBuffer.clear();
+                        isFragmented = false;
+                    };
+
+                    break;
+                };
+
+                default:
+                    // Unsupported opcode (e.g., binary or ping)
+                    break;
+            };
         };
     };
+
+    std::visit([&]<typename T0>(T0&& fn) {
+        using FnType = std::decay_t<T0>;
+        if constexpr (std::is_same_v<FnType, Middleware>) {
+            fn(request, response, next);
+        }
+        else {
+            fn(request, response);
+            next();
+        };
+    }, handlers.onRequest);
 };
 
-void HttpServer::upgradeWebSocket(const Socket_t socket, const HttpRequest& request, std::string& key) const {
-    HttpResponse response{ socket, request, this->mVersion, false };
-
+void HttpServer::upgradeWebSocket(HttpResponse& response, const std::string& mainKey) {
     response.setStatus(HttpStatus::SwitchingProtocols);
     response.setHeader("Connection", "Upgrade");
     response.setHeader("Upgrade", "websocket");
 
     {
+        std::string key{mainKey};
         const auto& input = key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
         unsigned char hash[SHA_DIGEST_LENGTH];
@@ -470,21 +477,21 @@ void HttpServer::upgradeWebSocket(const Socket_t socket, const HttpRequest& requ
 
         response.setHeader("Sec-WebSocket-Accept", output);
     };
-
-    response.send();
 };
 
 bool HttpServer::isUpgradeRequest(const HttpRequest& request) {
-    const auto& headers = request.getHeaders();
-    if (!headers.contains("Connection")
-        || headers.at("Connection") != "Upgrade")
+    if (const auto& connection = request.getHeader("Connection");
+        !connection.has_value()
+        || (connection.value() != "Upgrade" && connection.value() != "upgrade"))
         return false;
 
-    if (!headers.contains("Upgrade")
-        || headers.at("Upgrade") != "websocket")
+    if (const auto& upgrade = request.getHeader("Upgrade");
+        !upgrade.has_value()
+        || upgrade.value() != "websocket")
         return false;
 
-    if (!headers.contains("Sec-WebSocket-Key"))
+    if (const auto& key = request.getHeader("Sec-WebSocket-key");
+        !key.has_value())
         return false;
 
     return true;

@@ -68,6 +68,23 @@ HttpRequest::HttpRequest(Socket_t clientSocket, const std::string& data)
     this->mBody = body;
 };
 
+std::optional<std::string> HttpRequest::getHeader(const std::string& name) const {
+    std::string input{name};
+    std::ranges::transform(input, input.begin(),
+        [](const unsigned char c){ return std::tolower(c); });
+
+    for (auto& [key, value] : this->mHeaders) {
+        std::string kLower{key};
+        std::ranges::transform(kLower, kLower.begin(),
+            [](const unsigned char c){ return std::tolower(c); });
+
+        if (kLower == input)
+            return value;
+    };
+
+    return std::nullopt;
+};
+
 std::string HttpRequest::getRemoteAddr() const
 {
     sockaddr_in addr{};

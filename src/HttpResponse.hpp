@@ -8,15 +8,15 @@
 class HttpResponse
 {
 private:
-    bool mHeadersSent = false;
-    HttpStatus::Code mStatusCode = HttpStatus::OK;
-    HeadersMap_t mHeaders;
+    bool mHeadersSent{ false };
+    HttpStatus::Code mStatusCode{ HttpStatus::OK };
+    HeadersMap_t mHeaders{};
 
 protected:
-    Socket_t mClientSocket;
+    Socket_t mClientSocket{};
     HttpRequest mRequest;
-    bool mShouldClose = true;
-    HttpVersion::Version mVersion;
+    bool mShouldClose{ true };
+    HttpVersion::Version mVersion{ HttpVersion::HTTP_1_1 };
 
 public:
     HttpResponse(

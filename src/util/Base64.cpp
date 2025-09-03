@@ -7,7 +7,7 @@ namespace Base64
         return Base64::encode(bytes);
     };
 
-    std::string encode(const std::vector<uint8_t>& input) {
+    std::string encode(const std::span<const uint8_t> input) {
         auto bytes = input.data();
         std::size_t size = static_cast<int>(input.size());
 
@@ -57,7 +57,7 @@ namespace Base64
         return Base64::decode(bytes);
     };
 
-    std::vector<uint8_t> decode(const std::vector<uint8_t>& input) {
+    std::vector<uint8_t> decode(const std::span<const uint8_t> input) {
         std::vector<uint8_t> result;
         int i = 0;
         uint8_t a[4], b[3];

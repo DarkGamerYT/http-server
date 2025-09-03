@@ -15,14 +15,15 @@ class HttpRequest
     friend class HttpServer;
 
 private:
-    std::string mPath, mBody;
-    HttpMethod::Method mMethod;
-    HttpVersion::Version mVersion;
-    HeadersMap_t mHeaders;
+    std::string mPath{};
+    std::string mBody{};
+    HttpMethod::Method mMethod{ HttpMethod::GET };
+    HttpVersion::Version mVersion{ HttpVersion::HTTP_1_1 };
+    HeadersMap_t mHeaders{};
 
 protected:
-    Socket_t mClientSocket;
-    std::string mOriginalPath;
+    Socket_t mClientSocket{ 0 };
+    std::string mOriginalPath{};
 
 public:
     HttpRequest(Socket_t clientSocket, const std::string& data);
@@ -31,7 +32,9 @@ public:
     [[nodiscard]] const std::string& getPath() const { return this->mPath; };
     [[nodiscard]] const std::string& getOriginalPath() const { return this->mOriginalPath; };
     [[nodiscard]] const std::string& getBody() const { return this->mBody; };
+
     [[nodiscard]] const HeadersMap_t& getHeaders() const { return this->mHeaders; };
+    std::optional<std::string> getHeader(const std::string& name) const;
 
     [[nodiscard]] std::string getRemoteAddr() const;
     [[nodiscard]] HttpMethod::Method getMethod() const { return this->mMethod; };

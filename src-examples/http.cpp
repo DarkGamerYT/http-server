@@ -13,6 +13,10 @@ int main(int argc, char* argv[])
     );
 
     g_Server.websocket("/ws", {
+        .onRequest = [](const HttpRequest& request, HttpResponse& response) {
+            std::println("New request!");
+        },
+
         .onOpen = [](const WebSocket& ws) {
             std::println("New WebSocket connection");
             ws.send("Hello, world!");

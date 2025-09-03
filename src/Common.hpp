@@ -18,4 +18,22 @@
     typedef int Socket_t;
 #endif
 
+#include <functional>
+
+#include "util/HttpMethod.hpp"
+#include "util/HttpVersion.hpp"
+
+#include "Common.hpp"
+
+class HttpRequest;
+class HttpResponse;
+
+using NextFn = std::function<void()>;
+using Middleware = std::function<void(const HttpRequest&, HttpResponse&, NextFn)>;
+
+template<typename T>
+concept is_middlware =
+    std::is_convertible_v<T, Middleware> ||
+    std::is_invocable_r_v<void, T, const HttpRequest&, HttpResponse&>;
+
 #endif //HTTP_SERVER_COMMON_HPP
