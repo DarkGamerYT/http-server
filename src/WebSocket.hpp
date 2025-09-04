@@ -2,6 +2,7 @@
 #define WEBSOCKET_HPP
 
 #include <functional>
+#include <span>
 #include <string>
 
 #include "Common.hpp"
@@ -27,7 +28,10 @@ struct WebSocketHandler {
             next();
         };
     std::function<void(WebSocket&)> onOpen = [] (WebSocket&) {};
-    std::function<void(WebSocket&, const std::string&)> onMessage = [] (WebSocket&, const std::string&) {};
+
+    std::function<void(WebSocket&, const std::string&)> onText = [] (WebSocket&, const std::string&) {};
+    std::function<void(WebSocket&, std::span<const uint8_t>)> onBinary = [] (WebSocket&, std::span<const uint8_t>) {};
+
     std::function<void(WebSocket&)> onClose = [] (WebSocket&) {};
 };
 

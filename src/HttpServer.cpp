@@ -1,3 +1,5 @@
+#include <print>
+
 #include <openssl/sha.h>
 #include "util/Base64.hpp"
 
@@ -340,19 +342,14 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     HttpServer::upgradeWebSocket(response, key.value());
 
     const auto& handlers = route.value().second;
-    const auto& [
-        onRequest,
-        onOpen,
-        onMessage,
-        onClose ] = handlers;
-
     std::function next = [&]() {
         response.send();
 
         WebSocket webSocket{ socket };
-        onOpen(webSocket);
+        handlers.onOpen(webSocket);
 
-        std::string fragmentBuffer;
+        std::vector<uint8_t> fragmentBuffer;
+        uint8_t fragmentOpcode = 0;
         bool isFragmented = false;
         while (true)
         {
@@ -367,7 +364,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
 
             const uint8_t opcode = buffer[0] & 0x0F;
             if (opcode == 0x8) {
-                onClose(webSocket);
+                handlers.onClose(webSocket);
                 HttpServer::sendToSocket(socket, std::string{ static_cast<char>(0x88), 0x00 });
                 break;
             };
@@ -403,11 +400,11 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
             offset += 4;
 
             // Decode payload
-            std::string message;
-            message.reserve(payloadSize);
+            std::vector<uint8_t> payload;
+            payload.reserve(payloadSize);
 
             for (size_t i = 0; i < payloadSize; ++i)
-                message += static_cast<char>(buffer[offset + i] ^ maskingKey[i % 4]);
+                payload.push_back(static_cast<char>(buffer[offset + i] ^ maskingKey[i % 4]));
 
             switch (opcode)
             {
@@ -415,12 +412,28 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
                     // Text frame - possibly fragmented
                     if (!isFinal)
                     {
-                        fragmentBuffer = message;
+                        fragmentBuffer = payload;
+                        fragmentOpcode = opcode;
                         isFragmented = true;
                         continue;
                     };
 
-                    onMessage(webSocket, message);
+                    const std::string text{payload.begin(), payload.end()};
+                    handlers.onText(webSocket, text);
+                    break;
+                };
+
+                case 0x2: {
+                    // Binary frame - possibly fragmented
+                    if (!isFinal)
+                    {
+                        fragmentBuffer = payload;
+                        fragmentOpcode = opcode;
+                        isFragmented = true;
+                        continue;
+                    };
+
+                    handlers.onBinary(webSocket, payload);
                     break;
                 };
 
@@ -429,20 +442,25 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
                     if (!isFragmented)
                         continue; // Unexpected continuation
 
-                    fragmentBuffer += message;
+                    fragmentBuffer.insert(fragmentBuffer.end(), payload.begin(), payload.end());
+                    if (!isFinal)
+                        continue;
 
-                    if (isFinal)
-                    {
-                        onMessage(webSocket, fragmentBuffer);
-                        fragmentBuffer.clear();
-                        isFragmented = false;
+                    if (fragmentOpcode == 0x1) {
+                        const std::string text{fragmentBuffer.begin(), fragmentBuffer.end()};
+                        handlers.onText(webSocket, text);
+                    }
+                    else if (fragmentOpcode == 0x2) {
+                        handlers.onBinary(webSocket, fragmentBuffer);
                     };
 
+                    fragmentBuffer.clear();
+                    isFragmented = false;
                     break;
                 };
 
                 default:
-                    // Unsupported opcode (e.g., binary or ping)
+                    std::println("Unsupported opcode: {}", opcode);
                     break;
             };
         };

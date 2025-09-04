@@ -21,9 +21,14 @@ int main(int argc, char* argv[])
             std::println("New WebSocket connection");
             ws.send("Hello, world!");
         },
-        .onMessage = [](const WebSocket& ws, const std::string& msg) {
+
+        .onText = [](const WebSocket& ws, const std::string& msg) {
             std::println("Received message: '{}'", msg);
         },
+        .onBinary = [](const WebSocket& ws, std::span<const uint8_t> msg) {
+            std::println("Received binary message!");
+        },
+
         .onClose = [](const WebSocket& ws) {
             std::println("WebSocket closed");
         },
