@@ -19,7 +19,9 @@ int main(int argc, char* argv[])
 
         .onOpen = [](const WebSocket& ws) {
             std::println("New WebSocket connection");
+
             ws.send("Hello, world!");
+            ws.send(std::vector<uint8_t>{ 0x01, 0x02, 0x03 });
         },
 
         .onText = [](const WebSocket& ws, const std::string& msg) {

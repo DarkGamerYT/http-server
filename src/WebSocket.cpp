@@ -2,9 +2,9 @@
 
 #include "HttpServer.hpp"
 
-void WebSocket::send(const std::string& data) const {
+void WebSocket::sendFrame(const uint8_t opcode, std::span<const uint8_t> data) const {
     std::string frame;
-    frame.push_back(static_cast<char>(0x81)); // FIN + text frame
+    frame.push_back(static_cast<char>(0x80 | opcode));
 
     const size_t payloadSize = data.size();
     if (payloadSize <= 125) {
@@ -21,8 +21,22 @@ void WebSocket::send(const std::string& data) const {
             frame.push_back(static_cast<char>((payloadSize >> (8 * i)) & 0xFF));
     };
 
-    frame += data;
+    frame.append(reinterpret_cast<const char*>(data.data()), data.size());
     HttpServer::sendToSocket(this->mClientSocket, frame);
+};
+
+void WebSocket::send(const std::string& text) const {
+    this->sendFrame(0x1, std::span(
+        reinterpret_cast<const uint8_t*>(text.data()), text.size()
+    ));
+};
+
+void WebSocket::send(const std::vector<uint8_t>& binary) const {
+    this->sendFrame(0x2, binary);
+};
+
+void WebSocket::send(const std::span<const uint8_t> binary) const {
+    this->sendFrame(0x2, binary);
 };
 
 void WebSocket::closeSocket() const {

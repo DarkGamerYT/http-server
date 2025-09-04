@@ -16,8 +16,13 @@ public:
     explicit WebSocket(const Socket_t clientSocket)
         : mClientSocket(clientSocket) {};
 
-    void send(const std::string& data = "") const;
+    void send(const std::string& text) const;
+    void send(const std::vector<uint8_t>& binary) const;
+    void send(std::span<const uint8_t> binary) const;
     void closeSocket() const;
+
+private:
+    void sendFrame(uint8_t opcode, std::span<const uint8_t> data) const;
 };
 
 struct WebSocketHandler {
